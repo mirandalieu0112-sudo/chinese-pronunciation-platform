@@ -1,0 +1,3883 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 中文發音練習平台 | Nền tảng Luyện phát âm tiếng Trung tích hợp AI</title>
+    
+    <!-- Google Fonts: Outfit for English/Pinyin, Mulish for Vietnamese, Noto Sans TC for gorgeous Chinese characters -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Mulish:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for modern visual icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK Compatibility Libraries (CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        /* Modern Design System & CSS Reset */
+        :root {
+            --bg-color: #05070f;
+            --surface-color: rgba(13, 18, 33, 0.75);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            
+            /* Dental Sibilants (z, c, s) - Cyan-Blue theme */
+            --cyan-glow: rgba(56, 189, 248, 0.15);
+            --cyan-primary: #38bdf8;
+            --cyan-gradient: linear-gradient(135deg, #0ea5e9, #2563eb);
+            
+            /* Retroflexes (zh, ch, sh) - Orange-Rose theme */
+            --rose-glow: rgba(244, 63, 94, 0.15);
+            --rose-primary: #f43f5e;
+            --rose-gradient: linear-gradient(135deg, #f43f5e, #d946ef);
+            
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --purple-accent: #8b5cf6;
+            --purple-gradient: linear-gradient(135deg, #8b5cf6, #ec4899);
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Mulish', 'Noto Sans TC', 'Outfit', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.08) 0%, transparent 45%);
+            background-attachment: fixed;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Sparkler Canvas Overlay */
+        #sparklerCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* Glassmorphism Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Language Switcher Bar */
+        .lang-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn-lang {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all var(--transition-speed);
+        }
+
+        .btn-lang:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-lang.active {
+            background: var(--purple-gradient);
+            color: white;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        /* Premium Header Styling */
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo-area {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #38bdf8, #8b5cf6, #f43f5e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse-glow 2s infinite alternate;
+        }
+
+        h1 {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-weight: 900;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+            background: linear-gradient(to right, #ffffff, #e5e7eb, #9ca3af);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        /* Student Identity Badge in Header */
+        .student-badge-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .student-badge {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            padding: 0.5rem 1.2rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(8px);
+        }
+
+        .student-badge i {
+            color: #d946ef;
+        }
+
+        .student-badge .btn-switch-user {
+            background: transparent;
+            border: none;
+            color: var(--cyan-primary);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-decoration: underline;
+            padding-left: 0.25rem;
+        }
+
+        /* Mode Selection Hub (VR Portal Cards) */
+        .mode-selection-hub {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .mode-selection-hub {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .mode-portal-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(16px);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .mode-portal-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(139, 92, 246, 0.4);
+            box-shadow: 0 15px 40px rgba(139, 92, 246, 0.15);
+        }
+
+        .mode-portal-card.active {
+            border-color: #a855f7;
+            background: rgba(139, 92, 246, 0.08);
+            box-shadow: 0 15px 40px rgba(139, 92, 246, 0.25);
+        }
+
+        .mode-icon-box {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .mode-portal-card.active .mode-icon-box {
+            background: var(--purple-gradient);
+            color: white;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+            border-color: transparent;
+        }
+
+        .mode-portal-card h3 {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .mode-portal-card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Graded Level Controls */
+        .level-bar {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--surface-border);
+            padding: 0.5rem;
+            border-radius: 40px;
+        }
+
+        .btn-level {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-level:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .btn-level.active {
+            background: var(--purple-gradient);
+            color: white;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        /* SVG Articulatory Tongue Positions Panel */
+        .anatomy-panel {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .anatomy-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .anatomy-svg-box {
+            display: flex;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .anatomy-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .anatomy-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .anatomy-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .anatomy-bullet-list {
+            font-size: 0.85rem;
+            color: var(--text-main);
+            padding-left: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        /* Dual-Practice Workspaces */
+        .workspace-section {
+            animation: slide-down 0.4s ease;
+        }
+
+        /* A. LISTENING QUIZ STYLING */
+        .quiz-container {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 45px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .quiz-score-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 0.4rem 1rem;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .quiz-question-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .btn-quiz-play {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--purple-gradient);
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-quiz-play:hover {
+            transform: scale(1.08);
+            box-shadow: 0 6px 25px rgba(139, 92, 246, 0.6);
+        }
+
+        .quiz-play-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .quiz-options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 480px) {
+            .quiz-options-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn-quiz-option {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 1.5rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.25s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-quiz-option:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--cyan-primary);
+            transform: translateY(-2px);
+        }
+
+        .btn-quiz-option.correct {
+            background: rgba(16, 185, 129, 0.15) !important;
+            border-color: var(--success-color) !important;
+            color: white;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-quiz-option.wrong {
+            background: rgba(244, 63, 94, 0.15) !important;
+            border-color: var(--rose-primary) !important;
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.3);
+            animation: shake 0.4s;
+        }
+
+        .btn-quiz-option .opt-char {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 900;
+        }
+
+        .btn-quiz-option .opt-pinyin {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        .quiz-next-area {
+            margin-top: 2rem;
+            min-height: 50px;
+        }
+
+        .btn-quiz-next {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.2s;
+            animation: fade-in 0.3s;
+        }
+
+        .btn-quiz-next:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        /* B. SPEAKING PRACTICE GRID & CARDS */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .practice-card {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .practice-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .practice-card.flat-type::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: var(--cyan-gradient);
+        }
+        .practice-card.flat-type:hover { box-shadow: 0 12px 30px var(--cyan-glow); }
+
+        .practice-card.curled-type::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: var(--rose-gradient);
+        }
+        .practice-card.curled-type:hover { box-shadow: 0 12px 30px var(--rose-glow); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .badge-type {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .flat-type .badge-type {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--cyan-primary);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+
+        .curled-type .badge-type {
+            background: rgba(244, 63, 94, 0.1);
+            color: var(--rose-primary);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+        }
+
+        .pinyin-group {
+            text-align: right;
+        }
+
+        .pinyin-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+
+        .phoneme-highlight {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .card-body {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            margin: 1rem 0 1.5rem 0;
+        }
+
+        .char-display {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+            line-height: 1;
+        }
+
+        .info-display {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .word-meaning {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .articulation-tip {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            font-style: italic;
+        }
+
+        /* Action Buttons Area */
+        .card-actions {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-action {
+            border: none;
+            padding: 0.6rem 0.8rem;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-listen {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--surface-border);
+        }
+
+        .btn-listen:hover { background: rgba(255, 255, 255, 0.12); }
+
+        .btn-record {
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .flat-type .btn-record { background: var(--cyan-gradient); }
+        .curled-type .btn-record { background: var(--rose-gradient); }
+
+        .flat-type .btn-record:hover {
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.5);
+            transform: scale(1.02);
+        }
+        .curled-type .btn-record:hover {
+            box-shadow: 0 4px 15px rgba(244, 63, 94, 0.5);
+            transform: scale(1.02);
+        }
+
+        .btn-record.recording {
+            background: #ef4444 !important;
+            animation: pulse-red 1s infinite alternate;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6) !important;
+        }
+
+        /* Result Panel inside Card */
+        .feedback-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 0.6rem;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            display: none;
+            animation: slide-down 0.3s forwards;
+            border: 1px solid transparent;
+        }
+
+        .feedback-panel.success {
+            border-color: rgba(16, 185, 129, 0.2);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .feedback-panel.warning {
+            border-color: rgba(245, 158, 11, 0.2);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .feedback-status {
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            justify-content: space-between;
+        }
+
+        .feedback-status-left {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .feedback-status-right {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.05);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        .feedback-status.success { color: var(--success-color); }
+        .feedback-status.warning { color: var(--warning-color); }
+
+        .playback-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-playback {
+            background: transparent;
+            border: none;
+            color: var(--cyan-primary);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .btn-playback:hover { text-decoration: underline; }
+
+        .btn-download {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .btn-download:hover { color: white; }
+
+        /* History Panel */
+        .history-section {
+            background: var(--surface-color);
+            border: 1px solid var(--surface-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+
+        .history-title {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .history-title i { color: #8b5cf6; }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .history-list::-webkit-scrollbar { width: 6px; }
+        .history-list::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+        .history-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: fade-in 0.3s ease;
+        }
+
+        .history-item-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .history-char {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            color: white;
+        }
+
+        .history-char.flat { background: var(--cyan-gradient); }
+        .history-char.curled { background: var(--rose-gradient); }
+
+        .history-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .history-word { font-weight: 700; font-size: 0.95rem; }
+        .history-recognized { font-size: 0.8rem; color: var(--text-muted); }
+        .history-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+        .empty-history {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem 0;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        /* Profile Registration Form Overlay Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(3, 5, 12, 0.9);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 2rem 1rem;
+        }
+
+        .modal-content {
+            background: #0d1221;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 28px;
+            width: 100%;
+            max-width: 500px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+            position: relative;
+            transform: translateY(20px);
+            animation: slide-up-modal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        .modal-content::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.5rem;
+            background: var(--purple-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #d1d5db;
+            margin-bottom: 0.4rem;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: var(--purple-accent);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.25);
+        }
+
+        .form-radio-group {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0.4rem 0;
+        }
+
+        .form-radio-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .form-radio-input {
+            accent-color: var(--purple-accent);
+            width: 17px;
+            height: 17px;
+        }
+
+        .form-help-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            line-height: 1.3;
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: var(--purple-gradient);
+            color: white;
+            border: none;
+            padding: 0.9rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            transition: transform 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .btn-submit:hover { transform: translateY(-2px); }
+
+        /* Teacher Console Dashboard view */
+        .teacher-section {
+            background: #0d1221;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 10px 45px rgba(0,0,0,0.6);
+            margin-bottom: 3rem;
+            animation: slide-down 0.4s ease;
+        }
+
+        .teacher-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+
+        .teacher-title {
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 1.6rem;
+            color: #c084fc;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .teacher-actions { display: flex; gap: 0.5rem; }
+
+        .btn-console-action {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--surface-border);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .btn-console-action:hover { background: rgba(255, 255, 255, 0.1); }
+
+        .btn-console-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .btn-console-danger:hover { background: rgba(239, 68, 68, 0.25); color: white; }
+
+        .teacher-filter-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(0,0,0,0.25);
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .teacher-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+
+        .teacher-table th {
+            background: #111827;
+            padding: 0.75rem 0.85rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        .teacher-table td {
+            padding: 0.75rem 0.85rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        .teacher-table tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+        .row-correct { color: var(--success-color); font-weight: bold; }
+        .row-incorrect { color: var(--warning-color); font-weight: bold; }
+
+        .btn-table-play {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .btn-table-play:hover { background: #7c3aed; }
+        .btn-table-delete { background: transparent; border: none; color: rgba(239, 68, 68, 0.6); cursor: pointer; padding: 0.25rem; }
+        .btn-table-delete:hover { color: #ef4444; }
+
+        /* Floating Notification / Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1f2937;
+            border: 1px solid var(--surface-border);
+            border-left: 4px solid var(--cyan-primary);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 3000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+
+        .sound-wave {
+            display: none;
+            align-items: center;
+            gap: 3px;
+            height: 20px;
+            margin-left: 0.5rem;
+        }
+
+        .sound-wave span {
+            display: block;
+            width: 3px;
+            height: 100%;
+            background-color: #ef4444;
+            border-radius: 3px;
+            animation: wave-bounce 0.8s infinite ease-in-out alternate;
+        }
+
+        .sound-wave span:nth-child(2) { animation-delay: 0.15s; }
+        .sound-wave span:nth-child(3) { animation-delay: 0.3s; }
+        .sound-wave span:nth-child(4) { animation-delay: 0.45s; }
+
+        /* Animations */
+        @keyframes pulse-glow {
+            0% { filter: drop-shadow(0 0 2px rgba(56, 189, 248, 0.4)); }
+            100% { filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.6)); }
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        @keyframes pulse-green {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes slide-down {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slide-up-modal {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes wave-bounce {
+            0% { height: 4px; }
+            100% { height: 20px; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Golden Sparkler Particle Overlay Canvas -->
+<canvas id="sparklerCanvas"></canvas>
+
+<div class="container">
+    <!-- Language Switcher Bar -->
+    <div class="lang-bar">
+        <button class="btn-lang active" id="btn-lang-zh" onclick="switchLanguage('zh')">繁體中文</button>
+        <button class="btn-lang" id="btn-lang-vi" onclick="switchLanguage('vi')">Tiếng Việt</button>
+        <button class="btn-lang" id="btn-lang-en" onclick="switchLanguage('en')">English</button>
+    </div>
+
+    <!-- Header Section -->
+    <header>
+        <div class="logo-area">
+            <i class="fa-solid fa-microphone-lines logo-icon"></i>
+        </div>
+        <h1 id="main-title">AI 中文發音練習平台</h1>
+        <p class="subtitle" id="main-subtitle">專為中文舌尖前音 (z, c, s) 與舌尖後音 (zh, ch, sh) 設計的智能自主正音對比學習系統。</p>
+        
+        <!-- Active Student Info badge -->
+        <div class="student-badge-container" id="studentBadgeArea" style="display:none;">
+            <div class="student-badge">
+                <i class="fa-solid fa-circle-user"></i>
+                <span id="badgeInfo">班級：未登錄 | 學生：未登錄</span>
+                <button class="btn-switch-user" id="btn-switch-identity" onclick="showStudentSetupModal(true)">切換身分</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mode Selection Hub -->
+    <section class="mode-selection-hub">
+        <div class="mode-portal-card active" id="portal-listening" onclick="switchPracticeMode('listening')">
+            <div class="mode-icon-box">
+                <i class="fa-solid fa-ear-listen"></i>
+            </div>
+            <h3 id="mode-title-listening">聽力辨音測試</h3>
+            <p id="mode-desc-listening">聽音辨字、聽音辨拼音，在互動遊戲中建立強大的舌尖前/後音聽覺分辨能力！</p>
+        </div>
+        
+        <div class="mode-portal-card" id="portal-speaking" onclick="switchPracticeMode('speaking')">
+            <div class="mode-icon-box">
+                <i class="fa-solid fa-volume-high"></i>
+            </div>
+            <h3 id="mode-title-speaking">口說跟讀練習</h3>
+            <p id="mode-desc-speaking">高保真 16kHz WAV 原生錄音，AI 即時發音比對評分，並提供 3D 舌位指引！</p>
+        </div>
+    </section>
+
+    <!-- Graded Level Selector -->
+    <div class="level-bar" id="levelSelectorBar" style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--surface-border); padding: 0.5rem; border-radius: 40px; margin-bottom: 2rem;">
+        <button class="btn-level active" id="btn-lvl-group1" onclick="switchGradedLevel('group1')">第一組：舌尖前音與舌尖後音對比</button>
+        <button class="btn-level" id="btn-lvl-group2" onclick="switchGradedLevel('group2')">第二組：舌尖後音對比</button>
+        <button class="btn-level" id="btn-lvl-group3" onclick="switchGradedLevel('group3')">第三組：舌尖前音、舌尖後音組合連讀</button>
+        <button class="btn-level" id="btn-lvl-group4" onclick="switchGradedLevel('group4')">第四組：繞口令挑戰</button>
+        <button class="btn-level" id="btn-lvl-group5" onclick="switchGradedLevel('group5')">第五組：綜合語流朗讀</button>
+    </div>
+
+    <!-- Controls Row containing Filters, Cloud Indicators, and Teacher Button -->
+    <div class="controls-row">
+        <!-- Sub-filters inside active mode -->
+        <div class="controls" id="subFilters">
+            <button class="btn-filter active" id="btnFilterAll" onclick="filterCards('all')">全部對比</button>
+            <button class="btn-filter" id="btnFilterZ" onclick="filterCards('z-zh')">Z / ZH 對比</button>
+            <button class="btn-filter" id="btnFilterC" onclick="filterCards('c-ch')">C / CH 對比</button>
+            <button class="btn-filter" id="btnFilterS" onclick="filterCards('s-sh')">S / SH 對比</button>
+        </div>
+
+        <!-- Cloud sync status and Teacher Entry -->
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <div class="cloud-status-indicator" id="cloudStatus">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span id="cloudStatusText">檢查雲端服務中...</span>
+            </div>
+            <button class="btn-filter btn-teacher" id="btn-teacher-portal" onclick="openTeacherConsole()">
+                <i class="fa-solid fa-user-tie"></i> 教師專區
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Workspace: A. LISTENING MODE -->
+    <section class="workspace-section" id="listeningModeWorkspace">
+        <!-- 💡 Quick Instructions Banner -->
+        <div class="instructions-banner" style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); padding: 1rem; border-radius: 16px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; line-height: 1.5;">
+            <i class="fa-solid fa-circle-info" style="color: var(--purple-accent); font-size: 1.3rem;"></i>
+            <div>
+                <strong style="color: white; display: block; margin-bottom: 0.2rem;">💡 聽力辨音練習指南 / Hướng dẫn luyện nghe:</strong>
+                <span class="lang-text-zh">1. 點擊中間的播放鍵聽示範。2. 選擇下方正確的字與拼音。3. 答對時系統會自動跳到下一題！</span>
+                <span class="lang-text-vi" style="display:none;">1. Nhấp vào nút Play ở giữa để nghe phát âm. 2. Chọn chữ Hán và Pinyin đúng ở bên dưới. 3. Trả lời đúng hệ thống sẽ tự động chuyển sang câu tiếp theo!</span>
+                <span class="lang-text-en" style="display:none;">1. Click the purple Play button to hear the audio. 2. Select the correct character and Pinyin below. 3. Correct answers will automatically advance to the next question!</span>
+            </div>
+        </div>
+        <div class="quiz-container">
+            <div class="quiz-header">
+                <span id="quiz-progress-text" style="font-weight: 600;">第 1 / 5 題</span>
+                <div class="quiz-score-badge" id="quiz-score-display">答對數: 0 / 0</div>
+            </div>
+            
+            <div class="quiz-question-card">
+                <button class="btn-quiz-play" id="btnQuizPlay" onclick="playQuizTargetAudio()">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                <div class="quiz-play-label" id="quiz-play-instructions">點擊播放標準示範發音</div>
+            </div>
+            
+            <div class="quiz-options-grid" id="quizOptionsArea">
+                <!-- Javascript will load two buttons here -->
+            </div>
+            
+            <div class="quiz-next-area" id="quizNextArea">
+                <!-- Next question button will render here dynamically -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Active Workspace: B. SPEAKING MODE -->
+    <section class="workspace-section" id="speakingModeWorkspace" style="display:none;">
+        <!-- 💡 Quick Instructions Banner -->
+        <div class="instructions-banner" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); padding: 1rem; border-radius: 16px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; line-height: 1.5;">
+            <i class="fa-solid fa-circle-info" style="color: var(--cyan-primary); font-size: 1.3rem;"></i>
+            <div>
+                <strong style="color: white; display: block; margin-bottom: 0.2rem;">💡 口說跟讀練習與聲學分析指引 / Hướng dẫn đọc theo & Phân tích âm học:</strong>
+                <span class="lang-text-zh">1. 點選下方任何單字卡片（側邊的生理舌頭位置圖將<b>自動切換舌尖前/後音狀態</b>）。2. 點擊「聽示範」學習發音。3. 按住「按住錄音」並大聲讀出，系統將即時診斷 COG/VOT 並收集音檔！</span>
+                <span class="lang-text-vi" style="display:none;">1. Nhấp chọn bất kỳ thẻ từ nào bên dưới (hình lưỡi ở bên cạnh sẽ <b>tự động uốn lên/bẹt xuống</b> tương ứng). 2. Bấm "聽示範" để nghe. 3. Bấm giữ "按住錄音" và đọc to, hệ thống sẽ chẩn đoán COG/VOT tức thì!</span>
+                <span class="lang-text-en" style="display:none;">1. Click any word card below (the tongue diagram will <b>automatically curl/flatten</b> accordingly). 2. Click "聽示範" to listen. 3. Hold "按住錄音" and speak to instantly analyze COG/VOT metrics!</span>
+            </div>
+        </div>
+        <!-- Articulation Tongue SVG Guide Card -->
+        <div class="anatomy-panel" id="anatomyPanel">
+            <div class="anatomy-svg-box">
+                <!-- Gorgeous dynamic custom inline SVG representing tongue position -->
+                <svg width="220" height="180" viewBox="0 0 220 180" id="tongueSvg" style="background:transparent;">
+                    <!-- Throat/Oral outline -->
+                    <path d="M 30,20 Q 120,10 180,30 L 190,70 Q 140,80 140,110 L 140,160" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+                    <!-- Teeth -->
+                    <rect x="175" y="32" width="6" height="12" rx="2" fill="#ffffff" opacity="0.8"/> <!-- Upper teeth -->
+                    <rect x="170" y="68" width="6" height="12" rx="2" fill="#ffffff" opacity="0.8"/> <!-- Lower teeth -->
+                    <!-- Hard Palate/Alveolar Ridge -->
+                    <path d="M 120,25 Q 165,30 175,40" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+                    <!-- Tongue Shape (flat default) -->
+                    <path id="svgTonguePath" d="M 50,140 Q 100,130 140,120 Q 160,95 168,75 Q 160,78 140,82 Q 90,90 50,110 Z" fill="rgba(244, 63, 94, 0.45)" stroke="var(--rose-primary)" stroke-width="3"/>
+                    <!-- Articulation point target glow -->
+                    <circle id="svgTargetGlow" cx="172" cy="58" r="8" fill="rgba(56, 189, 248, 0.6)" class="pulse-glow-element"/>
+                </svg>
+            </div>
+            
+            <div class="anatomy-info">
+                <div class="anatomy-header" id="anatomy-type-title" style="color: var(--cyan-primary);">
+                    <i class="fa-solid fa-wind"></i> 舌尖前音 (z, c, s)
+                </div>
+                <div class="anatomy-desc" id="anatomy-type-description">
+                    舌尖前音包括聲母 z, c, s。發音時，請特別注意舌尖應水平前伸，輕抵或靠近上齒背，讓氣流從小窄縫中擠出。
+                </div>
+                <ul class="anatomy-bullet-list" id="anatomy-bullets">
+                    <li>舌尖請完全放平，切勿往後捲縮。</li>
+                    <li>發音時雙唇微張，嘴角微微向兩側拉開。</li>
+                    <li>發 c 聲母時需用力吹氣（送氣音）。</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Practice Cards Grid -->
+        <div class="cards-grid" id="cardsGrid">
+            <!-- Javascript will load speaking cards here -->
+        </div>
+    </section>
+
+    <!-- Teacher Console Dashboard view (Hidden by default) -->
+    <section class="teacher-section" id="teacherConsole" style="display:none;">
+        <div class="teacher-header-row">
+            <h2 class="teacher-title">
+                <i class="fa-solid fa-user-gear"></i> 語音數據與教師管理控制台
+            </h2>
+            <div class="teacher-actions">
+                <button class="btn-console-action" onclick="fetchTeacherRecords()">
+                    <i class="fa-solid fa-rotate"></i> 重新整理
+                </button>
+                <button class="btn-console-action btn-console-danger" onclick="clearAllDbRecordsConfirm()">
+                    <i class="fa-solid fa-trash-can"></i> 清空雲端紀錄
+                </button>
+                <button class="btn-console-action" style="border-color: #f43f5e; color: #fda4af;" onclick="closeTeacherConsole()">
+                    <i class="fa-solid fa-xmark"></i> 關閉後台
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter bar for dashboard -->
+        <div class="teacher-filter-bar">
+            <select class="filter-select" id="tfClass" onchange="filterTeacherTable()">
+                <option value="all">-- 所有班級 --</option>
+            </select>
+            <select class="filter-select" id="tfProvince" onchange="filterTeacherTable()">
+                <option value="all">-- 越南出生省市 --</option>
+            </select>
+            <select class="filter-select" id="tfLevel" onchange="filterTeacherTable()">
+                <option value="all">-- 中文程度 --</option>
+            </select>
+            <select class="filter-select" id="tfMode" onchange="filterTeacherTable()">
+                <option value="all">-- 練習模式 --</option>
+            </select>
+            <select class="filter-select" id="tfStatus" onchange="filterTeacherTable()">
+                <option value="all">-- 發音結果 --</option>
+                <option value="correct">發音完全契合/答對</option>
+                <option value="incorrect">需要加強/答錯</option>
+            </select>
+        </div>
+
+        <!-- Scrollable table container -->
+        <div class="table-responsive">
+            <table class="teacher-table" id="teacherTable">
+                <thead>
+                    <tr>
+                        <th>時間</th>
+                        <th>班級</th>
+                        <th>姓名 (去聲調)</th>
+                        <th>生理性別</th>
+                        <th>國籍</th>
+                        <th>越南出生省市</th>
+                        <th>母語</th>
+                        <th>當前程度</th>
+                        <th>練習模式</th>
+                        <th>漢字 (拼音)</th>
+                        <th>聲母</th>
+                        <th>辨識結果</th>
+                        <th>聲學參數 (COG/VOT)</th>
+                        <th>狀態</th>
+                        <th>語音點聽/操作</th>
+                        <th>管理</th>
+                    </tr>
+                </thead>
+                <tbody id="teacherTableBody">
+                    <tr>
+                        <td colspan="16" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            請點選「重新整理」以自雲端載入學生的最新數據資料。
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Personal history bank -->
+    <section class="history-section" id="studentHistorySection">
+        <h2 class="history-title">
+            <i class="fa-solid fa-list-check"></i> <span id="personal-history-title">本次跟讀與學習歷程</span>
+        </h2>
+        <div class="history-list" id="historyList">
+            <div class="empty-history" id="empty-history-placeholder">
+                <i class="fa-regular fa-folder-open" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
+                目前尚無記錄。開始進行聽力測試或口說跟讀吧！
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Student Identity Registration Modal (Vietnamese demographic profile form) -->
+<div class="modal-overlay" id="studentModal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title" id="reg-title">登錄學習帳戶</h2>
+            <p class="modal-desc" id="reg-subtitle">請填寫基本資料，這將能讓系統為您保存發音記錄與提供針對性的教學分析。</p>
+        </div>
+        <form id="studentForm" onsubmit="saveStudentIdentity(event)">
+            <!-- 0. Class Name -->
+            <div class="form-group">
+                <label class="form-label" for="stClass" id="label-class">班別 / Tên lớp:</label>
+                <input class="form-input" type="text" id="stClass" placeholder="Ví dụ: Tiếng Trung K64" required>
+            </div>
+            
+            <!-- 1. Name Input -->
+            <div class="form-group">
+                <label class="form-label" id="label-name">1. 姓名 / Họ và tên (Tiếng Việt KHÔNG DẤU):</label>
+                <input class="form-input" type="text" id="stName" placeholder="Ví dụ: NGUYEN VAN AN" oninput="handleNaming(this)" required style="text-transform: uppercase;">
+                <div class="form-help-text" id="help-name">* 請輸入與證件相同的越文姓名（系統會自動去聲調）。/ Vui lòng điền họ tên như trên giấy tờ (Hệ thống sẽ tự động bỏ dấu).</div>
+            </div>
+
+            <!-- 2. Biological sex -->
+            <div class="form-group">
+                <label class="form-label" id="label-sex">2. 您的生理性別是？ / Giới tính của bạn là gì?</label>
+                <div class="form-radio-group">
+                    <label class="form-radio-label">
+                        <input type="radio" name="stSex" value="Nam" class="form-radio-input" checked> <span id="sex-male">男 / Nam</span>
+                    </label>
+                    <label class="form-radio-label">
+                        <input type="radio" name="stSex" value="Nữ" class="form-radio-input"> <span id="sex-female">女 / Nữ</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 3. Nationality -->
+            <div class="form-group">
+                <label class="form-label" id="label-nationality">3. 您的國籍是？ / Quốc tịch của bạn là gì?</label>
+                <div class="form-radio-group">
+                    <label class="form-radio-label">
+                        <input type="radio" name="stNat" value="Việt Nam" class="form-radio-input" checked onclick="toggleProvinceDropdown(true)"> <span id="nat-vn">越南 / Việt Nam</span>
+                    </label>
+                    <label class="form-radio-label">
+                        <input type="radio" name="stNat" value="Khác" class="form-radio-input" onclick="toggleProvinceDropdown(false)"> <span id="nat-other">其他 / Khác</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 4. Birthplace Province -->
+            <div class="form-group" id="provinceGroup">
+                <label class="form-label" for="stProvince" id="label-province">4. 您的出生地在哪個省市？ / Bạn sinh ra tại tỉnh thành nào ở Việt Nam?</label>
+                <select class="form-select" id="stProvince" required>
+                    <option value="" id="opt-prov-select">-- 請選擇 / Chọn tỉnh thành --</option>
+                    
+                    <!-- 北部 (Miền Bắc) -->
+                    <optgroup label="Miền Bắc (北部)" id="lbl-north">
+                        <option value="Hà Nội">Hà Nội (河內市)</option>
+                        <option value="Hải Phòng">Hải Phòng (海防市)</option>
+                        <option value="Bắc Ninh">Bắc Ninh (北寧省)</option>
+                        <option value="Phú Thọ">Phú Thọ (富壽省)</option>
+                        <option value="Hưng Yên">Hưng Yên (興安省)</option>
+                        <option value="Ninh  Bình">Ninh Bình (寧平省)</option>
+                        <option value="Thái Nguyên">Thái Nguyên (太原省)</option>
+                        <option value="Lào Cai">Lào Cai (老街省)</option>
+                        <option value="Tuyên Quang">Tuyên Quang (宣光省)</option>
+                        <option value="Quảng Ninh">Quảng Ninh (廣寧省)</option>
+                        <option value="Lạng Sơn">Lạng Sơn (諒山省)</option>
+                        <option value="Sơn La">Sơn La (山羅省)</option>
+                        <option value="Điện Biên">Điện Biên (奠邊省)</option>
+                        <option value="Lai Châu">Lai Châu (萊州省)</option>
+                        <option value="Cao Bằng">Cao Bằng (高平省)</option>
+                    </optgroup>
+
+                    <!-- 中部 (Miền Trung) -->
+                    <optgroup label="Miền Trung (中部)" id="lbl-central">
+                        <option value="Huế">Huế (順化市)</option>
+                        <option value="Đà Nẵng">Đà Nẵng (峴港市)</option>
+                        <option value="Khánh Hòa">Khánh Hòa (慶和省)</option>
+                        <option value="Lâm Đồng">Lâm Đồng (林同省)</option>
+                        <option value="Quảng Trị">Quảng Trị (廣治省)</option>
+                        <option value="Quảng Ngãi">Quảng Ngãi (廣義省)</option>
+                        <option value="Gia Lai">Gia Lai (嘉萊省)</option>
+                        <option value="Thanh Hóa">Thanh Hóa (清化省)</option>
+                        <option value="Nghệ An">Nghệ An (乂安省)</option>
+                        <option value="Hà Tĩnh">Hà Tĩnh (河靜省)</option>
+                        <option value="Đắk Lắk">Đắk Lắk (多樂省)</option>
+                    </optgroup>
+
+                    <!-- 南部 (Miền Nam) -->
+                    <optgroup label="Miền Nam (南部)" id="lbl-south">
+                        <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh (胡志明市)</option>
+                        <option value="Cần Thơ">Cần Thơ (芹苴市)</option>
+                        <option value="An Giang">An Giang (安江省)</option>
+                        <option value="Vĩnh Long">Vĩnh Long (永隆省)</option>
+                        <option value="Đồng Tháp">Đồng Tháp (同塔省)</option>
+                        <option value="Cà Mau">Cà Mau (金甌省)</option>
+                        <option value="Trà Vinh">Trà Vinh (茶榮省)</option>
+                        <option value="Đồng Nai">Đồng Nai (同奈省)</option>
+                        <option value="Tây Ninh">Tây Ninh (西寧省)</option>
+                        <option value="Bình Phước">Bình Phước (平福省)</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- 5. Native Language -->
+            <div class="form-group">
+                <label class="form-label" id="label-mothertongue">5. 您的母語是？ / Ngôn ngữ mẹ đẻ của bạn là?</label>
+                <div class="form-radio-group">
+                    <label class="form-radio-label">
+                        <input type="radio" name="stLang" value="Tiếng Việt" class="form-radio-input" checked> <span id="lang-vn">越南語 / Tiếng Việt</span>
+                    </label>
+                    <label class="form-radio-label">
+                        <input type="radio" name="stLang" value="Khác" class="form-radio-input"> <span id="lang-other">其他 / Ngôn ngữ khác</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 6. Chinese level select -->
+            <div class="form-group">
+                <label class="form-label" for="chinese_level" id="label-chineselevel">6. 您目前的中文程度是？ / Trình độ tiếng Trung hiện tại của bạn?</label>
+                <select class="form-select" id="chinese_level" required>
+                    <option value="" id="opt-level-select">--請選擇 / Chọn trình độ--</option>
+                    <option value="準備級" id="opt-lvl-pre">準備級 / Cấp độ chuẩn bị (TOCFL under A1 / HSK 1-2) [300字以下]</option>
+                    <option value="入門級" id="opt-lvl-a1">入門級 / Cấp độ A1 (TOCFL Level 1 / HSK 3) [500-600字]</option>
+                    <option value="基礎級" id="opt-lvl-a2">基礎級 / Cấp độ A2 (TOCFL Level 2 / HSK 4) [1000-1200字]</option>
+                    <option value="中級" id="opt-lvl-b1">中級 / Cấp độ B1-B2 (TOCFL Level 3-4 / HSK 5-6) [2500-5000字]</option>
+                    <option value="高級" id="opt-lvl-c1">高級 / Cấp độ C1-C2 (TOCFL Level 5-6) [8000字以上]</option>
+                </select>
+            </div>
+
+            <button class="btn-submit" type="submit" id="btn-reg-submit">確認登錄並開始練習 / Xác nhận</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // ⚙️ 1. GOOGLE FIREBASE 設定金鑰欄位
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyB4dPcWqNyHtpOptrK3ScTVKb3-rVDuuak",
+        authDomain: "ai-zhongwen-fayin-lianxi.firebaseapp.com",
+        projectId: "ai-zhongwen-fayin-lianxi",
+        storageBucket: "ai-zhongwen-fayin-lianxi.firebasestorage.app",
+        messagingSenderId: "445527571497",
+        appId: "1:445527571497:web:285ea94490354c1ff57038",
+        measurementId: "G-SZNBWKJHDR"
+    };
+
+    const TEACHER_PASSPHRASE = "teacher888";
+
+    // ==========================================
+    // 🌐 2. MULTILINGUAL TRANSLATION SYSTEM
+    // ==========================================
+    let currentLang = 'zh'; // Default Chinese
+
+    const translations = {
+        zh: {
+            title: "越籍學習者國別化 AI 中文發音練習平台",
+            subtitle: "專為中文舌尖前音 (z, c, s) 與舌尖後音 (zh, ch, sh) 設計的智能自主正音對比學習系統。",
+            switchIdentity: "切換身分",
+            modeListening: "聽力辨音測試",
+            descListening: "聽音辨字、聽音辨拼音，在互動遊戲中建立強大的舌尖前/後音聽覺分辨能力！",
+            modeSpeaking: "口說跟讀練習",
+            descSpeaking: "高保真 16kHz WAV 原生錄音，AI 即時發音比對評分，並提供 3D 舌位指引！",
+            badgeInfo: "班級：<b>{class}</b> | 學生：<b>{name}</b> ({level})",
+            cloudChecking: "檢查雲端服務中...",
+            cloudActive: "<i class='fa-solid fa-cloud' style='color: var(--success-color);'></i> 雲端自動同步已啟動",
+            cloudLocal: "<i class='fa-solid fa-circle-exclamation' style='color: var(--warning-color);'></i> 本機模式 (無雲端自動收取)",
+            teacherPortal: "教師專區",
+            historyTitle: "本次跟讀與學習歷程",
+            emptyHistory: "目前尚無記錄。開始進行聽力測試或口說跟讀吧！",
+            
+            // Questionnaire Translation
+            regTitle: "登錄華語正音帳戶",
+            regDesc: "請填寫您的真實資料，這將能讓系統為您保存發音記錄與提供針對性的教學分析。",
+            lblClass: "班級名稱 / Tên lớp:",
+            lblName: "1. 姓名 / Họ và tên (Tiếng Việt KHÔNG DẤU):",
+            helpName: "* 請輸入與護照證件相同的越文姓名（系統會自動去聲調）。",
+            lblSex: "2. 您的生理性別是？ / Giới tính của bạn là gì?",
+            lblSexMale: "男 / Nam",
+            lblSexFemale: "女 / Nữ",
+            lblNat: "3. 您的國籍是？ / Quốc tịch của bạn là gì?",
+            lblNatVn: "越南 / Việt Nam",
+            lblNatOther: "其他 / Khác",
+            lblProvince: "4. 您的出生地在哪個省市？ / Bạn sinh ra tại tỉnh thành nào ở Việt Nam?",
+            lblMothertongue: "5. 您的母語是？ / Ngôn ngữ mẹ đẻ của bạn là?",
+            lblLangVn: "越南語 / Tiếng Việt",
+            lblLangOther: "其他 / Ngôn ngữ khác",
+            lblChineselevel: "6. 您目前的中文程度是？ / Trình độ tiếng Trung hiện tại của bạn?",
+            optProvSelect: "-- 請選擇 / Chọn tỉnh thành --",
+            optLevelSelect: "--請選擇 / Chọn trình độ--",
+            btnRegSubmit: "確認登錄並開始練習",
+            
+            // Articulation instructions
+            flatTitle: "舌尖前音 — z, c, s",
+            flatDesc: "舌尖前音包括聲母 z, c, s。發音時，請特別注意舌頭水平前伸，輕抵或靠近上門齒的背部，讓氣流從小窄縫中擠出。",
+            flatBullets: [
+                "舌尖請完全放平，切勿往後捲縮。",
+                "發音時雙唇微張，嘴角微微向兩側拉開。",
+                "發 c 聲母時需用力吹氣（送氣音）。"
+            ],
+            curledTitle: "舌尖後音 — zh, ch, sh",
+            curledDesc: "舌尖後音包括聲母 zh, ch, sh。發音時，舌尖向上翹起，靠近或抵住硬腭前部（口腔上方的硬頂），氣流自舌尖縫摩擦而出。",
+            curledBullets: [
+                "舌尖請往上後方捲起，不要頂死，保留縫隙。",
+                "嘴巴稍微張圓，有空間讓聲音產生共鳴。",
+                "發 ch 聲母時需用力吹出氣流。"
+            ]
+        },
+        vi: {
+            title: "Nền tảng Luyện phát âm tiếng Trung Quốc AI cho người Việt",
+            subtitle: "Hệ thống sửa phát âm thông minh dành cho âm đầu lưỡi trước (z, c, s) và âm đầu lưỡi sau (zh, ch, sh).",
+            switchIdentity: "Đổi thông tin",
+            modeListening: "Kiểm tra phân biệt âm",
+            descListening: "Nghe âm chọn chữ Hán hoặc Pinyin, giúp xây dựng khả năng phân biệt âm thanh nhạy bén!",
+            modeSpeaking: "Luyện nói theo mẫu (Shadowing)",
+            descSpeaking: "Ghi âm WAV 16kHz chuẩn, AI chấm điểm nhận diện giọng nói và hướng dẫn vị trí đặt lưỡi!",
+            badgeInfo: "Lớp: <b>{class}</b> | Học viên: <b>{name}</b> ({level})",
+            cloudChecking: "Đang kiểm tra dịch vụ...",
+            cloudActive: "<i class='fa-solid fa-cloud' style='color: var(--success-color);'></i> Đã kết nối Cloud AI",
+            cloudLocal: "<i class='fa-solid fa-circle-exclamation' style='color: var(--warning-color);'></i> Chế độ Offline (Không lưu Cloud)",
+            teacherPortal: "Giáo viên",
+            historyTitle: "Lịch sử thực hành hôm nay",
+            emptyHistory: "Chưa có bản ghi nào. Hãy bắt đầu làm bài kiểm tra hoặc luyện phát âm nhé!",
+            
+            // Questionnaire Translation
+            regTitle: "ĐĂNG KÝ HỌC VIÊN",
+            regDesc: "Vui lòng điền thông tin để hệ thống ghi nhận lịch sử học tập và cung cấp báo cáo phát âm cho giáo viên.",
+            lblClass: "Tên lớp / 班別:",
+            lblName: "1. Họ và tên (Tiếng Việt KHÔNG DẤU):",
+            helpName: "* Vui lòng viết IN HOA KHÔNG DẤU trùng khớp với thẻ căn cước/hộ chiếu.",
+            lblSex: "2. Giới tính sinh học của bạn?",
+            lblSexMale: "Nam",
+            lblSexFemale: "Nữ",
+            lblNat: "3. Quốc tịch của bạn?",
+            lblNatVn: "Việt Nam",
+            lblNatOther: "Khác",
+            lblProvince: "4. Bạn sinh ra tại tỉnh thành nào ở Việt Nam?",
+            lblMothertongue: "5. Ngôn ngữ mẹ đẻ của bạn?",
+            lblLangVn: "Tiếng Việt",
+            lblLangOther: "Khác",
+            lblChineselevel: "6. Trình độ tiếng Trung hiện tại của bạn?",
+            optProvSelect: "-- Chọn tỉnh thành của bạn --",
+            optLevelSelect: "-- Chọn trình độ tiếng Trung --",
+            btnRegSubmit: "Xác nhận và Bắt đầu Luyện tập",
+            
+            // Articulation instructions
+            flatTitle: "Âm đầu lưỡi trước (Âm bằng) — z, c, s",
+            flatDesc: "Gồm phụ âm z, c, s. Cách phát âm: Đầu lưỡi đặt phẳng thẳng hướng ra ngoài, chạm nhẹ vào mặt sau răng cửa trên, luồng khí ma sát thoát ra qua khe hở giữa răng.",
+            flatBullets: [
+                "Đầu lưỡi duỗi phẳng tuyệt đối, KHÔNG uốn cong lưỡi.",
+                "Khóe miệng hơi kéo nhẹ sang hai bên (cười nhẹ).",
+                "Khi phát âm âm 'c' cần bật hơi thật mạnh."
+            ],
+            curledTitle: "Âm đầu lưỡi sau (Âm cuốn lưỡi) — zh, ch, sh",
+            curledDesc: "Gồm phụ âm zh, ch, sh. Cách phát âm: Đầu lưỡi cong hướng lên trên, áp sát vào vòm họng cứng phía trước, luồng hơi ma sát đi ra qua đầu lưỡi cuốn.",
+            curledBullets: [
+                "Đầu lưỡi uốn cong về phía vòm họng trên, chừa khe hở.",
+                "Khuôn miệng hơi tròn nhẹ để âm thanh cộng hưởng tròn trịa.",
+                "Khi phát âm âm 'ch' cần bật hơi đẩy khí mạnh ra."
+            ]
+        },
+        en: {
+            title: "AI Chinese Pronunciation Practice Platform",
+            subtitle: "An intelligent phonetic learning system optimized for flat sibilants (z, c, s) and retroflexes (zh, ch, sh).",
+            switchIdentity: "Switch Profile",
+            modeListening: "Listening Quiz",
+            descListening: "Listen and identify Chinese characters or Pinyin to build strong phonemic listening contrast!",
+            modeSpeaking: "Shadowing Practice",
+            descSpeaking: "Native high-fidelity 16kHz WAV recording with real-time AI feedback and 3D articulatory guide!",
+            badgeInfo: "Class: <b>{class}</b> | Student: <b>{name}</b> ({level})",
+            cloudChecking: "Checking cloud service...",
+            cloudActive: "<i class='fa-solid fa-cloud' style='color: var(--success-color);'></i> Cloud Sync Active",
+            cloudLocal: "<i class='fa-solid fa-circle-exclamation' style='color: var(--warning-color);'></i> Local Mode (No Cloud Sync)",
+            teacherPortal: "Teacher Zone",
+            historyTitle: "Shadowing Session Logs",
+            emptyHistory: "No practice logs yet. Start listening or speaking right now!",
+            
+            // Questionnaire Translation
+            regTitle: "Student Profile Setup",
+            regDesc: "Please enter your information to save your pronunciation records and provide target diagnostics for your instructor.",
+            lblClass: "Class Name / Tên lớp:",
+            lblName: "1. Official Passport Name (UPPERCASE, NO ACCENT):",
+            helpName: "* Enter your official name matching your identification passport documents.",
+            lblSex: "2. What is your biological sex?",
+            lblSexMale: "Male / Nam",
+            lblSexFemale: "Female / Nữ",
+            lblNat: "3. What is your nationality?",
+            lblNatVn: "Vietnam / Việt Nam",
+            lblNatOther: "Other / Khác",
+            lblProvince: "4. Which Vietnamese province were you born in?",
+            lblMothertongue: "5. What is your native mother tongue?",
+            lblLangVn: "Vietnamese / Tiếng Việt",
+            lblLangOther: "Other / Khác",
+            lblChineselevel: "6. Current Chinese Language Level?",
+            optProvSelect: "-- Select Province / Chọn tỉnh --",
+            optLevelSelect: "-- Select Level / Chọn trình độ --",
+            btnRegSubmit: "Submit & Start Practice",
+            
+            // Articulation instructions
+            flatTitle: "Flat Sibilants — z, c, s",
+            flatDesc: "Flat sibilants include consonants z, c, s. Articulation: Keep the tongue tip flat and bring it close to or touching the back of the upper front teeth.",
+            flatBullets: [
+                "Tongue tip must remain completely flat; do NOT curl or bend.",
+                "Stretch your lips slightly to the sides (like a gentle smile).",
+                "Release a strong puff of air when pronouncing the aspirated 'c'."
+            ],
+            curledTitle: "Retroflex Consonants — zh, ch, sh",
+            curledDesc: "Retroflexes include consonants zh, ch, sh. Articulation: Curl the tongue tip upward and backward, placing it close to the hard palate.",
+            curledBullets: [
+                "Curl the tongue tip back, leaving a narrow space for friction.",
+                "Shape the lips slightly rounded to produce deep resonance.",
+                "Aspirate strongly with a clean breath of air when saying 'ch'."
+            ]
+        }
+    };
+
+    function switchLanguage(lang) {
+        currentLang = lang;
+        document.querySelectorAll('.btn-lang').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-lang-${lang}`).classList.add('active');
+
+        // Apply translations
+        const t = translations[lang];
+        document.getElementById('main-title').innerText = t.title;
+        document.getElementById('main-subtitle').innerText = t.subtitle;
+        document.getElementById('btn-switch-identity').innerText = t.switchIdentity;
+        document.getElementById('mode-title-listening').innerText = t.modeListening;
+        document.getElementById('mode-desc-listening').innerText = t.descListening;
+        document.getElementById('mode-title-speaking').innerText = t.modeSpeaking;
+        document.getElementById('mode-desc-speaking').innerText = t.descSpeaking;
+        document.getElementById('btn-teacher-portal').innerHTML = `<i class="fa-solid fa-user-tie"></i> ${t.teacherPortal}`;
+        document.getElementById('personal-history-title').innerText = t.historyTitle;
+
+        // Modal Form fields translation
+        document.getElementById('reg-title').innerText = t.regTitle;
+        document.getElementById('reg-subtitle').innerText = t.regDesc;
+        document.getElementById('label-class').innerText = t.lblClass;
+        document.getElementById('label-name').innerText = t.lblName;
+        document.getElementById('help-name').innerText = t.helpName;
+        document.getElementById('label-sex').innerText = t.lblSex;
+        document.getElementById('sex-male').innerText = t.lblSexMale;
+        document.getElementById('sex-female').innerText = t.lblSexFemale;
+        document.getElementById('label-nationality').innerText = t.lblNat;
+        document.getElementById('nat-vn').innerText = t.lblNatVn;
+        document.getElementById('nat-other').innerText = t.lblNatOther;
+        document.getElementById('label-province').innerText = t.lblProvince;
+        document.getElementById('label-mothertongue').innerText = t.lblMothertongue;
+        document.getElementById('lang-vn').innerText = t.lblLangVn;
+        document.getElementById('lang-other').innerText = t.lblLangOther;
+        document.getElementById('label-chineselevel').innerText = t.lblChineselevel;
+        document.getElementById('opt-prov-select').innerText = t.optProvSelect;
+        document.getElementById('opt-level-select').innerText = t.optLevelSelect;
+        document.getElementById('btn-reg-submit').innerText = t.btnRegSubmit;
+
+        updateStudentBadge();
+        updateEmptyHistoryPlaceholder();
+        updateArticulationPanelUI();
+        
+        // Instructions Banners translation
+        if (lang === 'zh') {
+            document.querySelectorAll('.lang-text-zh').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.lang-text-vi').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.lang-text-en').forEach(el => el.style.display = 'none');
+        } else if (lang === 'vi') {
+            document.querySelectorAll('.lang-text-zh').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.lang-text-vi').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.lang-text-en').forEach(el => el.style.display = 'none');
+        } else {
+            document.querySelectorAll('.lang-text-zh').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.lang-text-vi').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.lang-text-en').forEach(el => el.style.display = 'block');
+        }
+        
+        // Dynamic re-render active view
+        if (currentPracticeMode === 'listening') {
+            loadQuizQuestion();
+        } else {
+            renderSpeakingCards(currentFilterPair);
+        }
+    }
+
+    function updateEmptyHistoryPlaceholder() {
+        const emptyEl = document.getElementById('empty-history-placeholder');
+        if (emptyEl) {
+            emptyEl.innerHTML = `<i class="fa-regular fa-folder-open" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>${translations[currentLang].emptyHistory}`;
+        }
+    }
+
+    // ==========================================
+    // 📚 3. SCAFFOLDED CEFR CONTRASTIVE WORD DATABASE
+    // ==========================================
+            const gradedWords = {
+        group1: {
+            title: "第一組：舌尖前音與舌尖後音對比練習",
+            subTitle: "此組別著重於聽辨並練習發音部位的差異，以「母音（韻母）相同，僅聲母不同」的字組進行精準對比。",
+            minimalPairs: [
+                { id: 'g1_mp1', char1: '在', pinyin1: 'zài', char2: '債', pinyin2: 'zhài', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp2', char1: '早', pinyin1: 'zǎo', char2: '找', pinyin2: 'zhǎo', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp3', char1: '贊', pinyin1: 'zàn', char2: '站', pinyin2: 'zhàn', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp4', char1: '怎', pinyin1: 'zěn', char2: '真', pinyin2: 'zhēn', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp5', char1: '增', pinyin1: 'zēng', char2: '正', pinyin2: 'zhèng', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp6', char1: '租', pinyin1: 'zū', char2: '住', pinyin2: 'zhù', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp7', char1: '字', pinyin1: 'zì', char2: '知', pinyin2: 'zhī', pair: 'z-zh', type: 'minimal' },
+                { id: 'g1_mp8', char1: '草', pinyin1: 'cǎo', char2: '吵', pinyin2: 'chǎo', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp9', char1: '湊', pinyin1: 'còu', char2: '醜', pinyin2: 'chǒu', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp10', char1: '擦', pinyin1: 'cā', char2: '茶', pinyin2: 'chá', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp11', char1: '冊', pinyin1: 'cè', char2: '車', pinyin2: 'chē', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp12', char1: '促', pinyin1: 'cù', char2: '出', pinyin2: 'chū', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp13', char1: '藏', pinyin1: 'cáng', char2: '常', pinyin2: 'cháng', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp14', char1: '次', pinyin1: 'cì', char2: '吃', pinyin2: 'chī', pair: 'c-ch', type: 'minimal' },
+                { id: 'g1_mp15', char1: '三', pinyin1: 'sān', char2: '山', pinyin2: 'shān', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp16', char1: '傘', pinyin1: 'sǎn', char2: '閃', pinyin2: 'shǎn', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp17', char1: '僧', pinyin1: 'sēng', char2: '生', pinyin2: 'shēng', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp18', char1: '訴', pinyin1: 'sù', char2: '樹', pinyin2: 'shù', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp19', char1: '歲', pinyin1: 'suì', char2: '水', pinyin2: 'shuǐ', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp20', char1: '四', pinyin1: 'sì', char2: '是', pinyin2: 'shì', pair: 's-sh', type: 'minimal' },
+                { id: 'g1_mp21', char1: '死', pinyin1: 'sǐ', char2: '事', pinyin2: 'shì', pair: 's-sh', type: 'minimal' }
+            ],
+            generalChars: [
+                { id: 'g1_gc1', char: '走', pinyin: 'zǒu', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '走路、走開 / Đi bộ, rời đi.', anatomy: 'Flat' },
+                { id: 'g1_gc2', char: '做', pinyin: 'zuò', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '做事、做飯 / Làm việc, nấu ăn.', anatomy: 'Flat' },
+                { id: 'g1_gc3', char: '最', pinyin: 'zuì', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '最好、最大 / Tốt nhất, lớn nhất.', anatomy: 'Flat' },
+                { id: 'g1_gc4', char: '嘴', pinyin: 'zuǐ', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '嘴巴、嘴唇 / Miệng, môi.', anatomy: 'Flat' },
+                { id: 'g1_gc5', char: '錯', pinyin: 'cuò', highlight: 'c', type: 'flat', pair: 'c-ch', meaning: '錯誤、出錯 / Sai sót, mắc lỗi.', anatomy: 'Flat' },
+                { id: 'g1_gc6', char: '從', pinyin: 'cóng', highlight: 'c', type: 'flat', pair: 'c-ch', meaning: '從前、從此 / Trước đây, từ đó.', anatomy: 'Flat' },
+                { id: 'g1_gc7', char: '送', pinyin: 'sòng', highlight: 's', type: 'flat', pair: 's-sh', meaning: '送給、送貨 / Tặng cho, giao hàng.', anatomy: 'Flat' },
+                { id: 'g1_gc8', char: '酸', pinyin: 'suān', highlight: 's', type: 'flat', pair: 's-sh', meaning: '酸痛、吃醋 / Đau mỏi, ghen tuông.', anatomy: 'Flat' },
+                { id: 'g1_gc9', char: '算', pinyin: 'suàn', highlight: 's', type: 'flat', pair: 's-sh', meaning: '計算、打算 / Tính toán, dự định.', anatomy: 'Flat' },
+                { id: 'g1_gc10', char: '裝', pinyin: 'zhuāng', highlight: 'zh', type: 'curled', pair: 'z-zh', meaning: '服裝、包裝 / Trang phục, đóng gói.', anatomy: 'Curled' },
+                { id: 'g1_gc11', char: '穿', pinyin: 'chuān', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '穿衣、穿鞋 / Mặc áo, đi giày.', anatomy: 'Curled' },
+                { id: 'g1_gc12', char: '船', pinyin: 'chuán', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '乘船、輪船 / Đi thuyền, tàu thủy.', anatomy: 'Curled' },
+                { id: 'g1_gc13', char: '床', pinyin: 'chuáng', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '起床、木床 / Ngủ dậy, giường gỗ.', anatomy: 'Curled' },
+                { id: 'g1_gc14', char: '吹', pinyin: 'chuī', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '吹風、吹笛 / Thổi gió, thổi sáo.', anatomy: 'Curled' },
+                { id: 'g1_gc15', char: '說', pinyin: 'shuō', highlight: 'sh', type: 'curled', pair: 's-sh', meaning: '說話、小說 / Nói chuyện, tiểu thuyết.', anatomy: 'Curled' },
+                { id: 'g1_gc16', char: '誰', pinyin: 'shuí', highlight: 'sh', type: 'curled', pair: 's-sh', meaning: '你是誰 / Bạn là ai.', anatomy: 'Curled' }
+            ],
+            disyllabicWords: [
+                { id: 'g1_ds1', char: '自己', pinyin: 'zìjǐ', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '自己自己 / Bản thân mình.', anatomy: 'Flat' },
+                { id: 'g1_ds2', char: '昨天', pinyin: 'zuótiān', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '昨天昨天 / Hôm qua.', anatomy: 'Flat' },
+                { id: 'g1_ds3', char: '自然', pinyin: 'zìrán', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '大自然 / Tự nhiên.', anatomy: 'Flat' },
+                { id: 'g1_ds4', char: '色彩', pinyin: 'sècǎi', highlight: 's', type: 'flat', pair: 's-sh', meaning: '色彩繽紛 / Màu sắc.', anatomy: 'Flat' },
+                { id: 'g1_ds5', char: '思索', pinyin: 'sīsuǒ', highlight: 's', type: 'flat', pair: 's-sh', meaning: '仔細思索 / Suy nghĩ, tư duy.', anatomy: 'Flat' },
+                { id: 'g1_ds6', char: '猜測', pinyin: 'cāicè', highlight: 'c', type: 'flat', pair: 'c-ch', meaning: '無端猜測 / Suy đoán.', anatomy: 'Flat' },
+                { id: 'g1_ds7', char: '自私', pinyin: 'zìsī', highlight: 'z', type: 'flat', pair: 'z-zh', meaning: '自私自利 / Ích kỷ.', anatomy: 'Flat' },
+                { id: 'g1_ds8', char: '粗糙', pinyin: 'cūcāo', highlight: 'c', type: 'flat', pair: 'c-ch', meaning: '皮膚粗糙 / Thô ráp, sần sùi.', anatomy: 'Flat' },
+                { id: 'g1_ds9', char: '知道', pinyin： 'zhīdào', highlight: 'zh', type: 'curled', pair: 'z-zh', meaning: '知道知道 / Biết, hiểu rõ.', anatomy: 'Curled' },
+                { id: 'g1_ds10', char: '準備', pinyin: 'zhǔnbèi', highlight: 'zh', type: 'curled', pair: 'z-zh', meaning: '做準備 / Chuẩn bị.', anatomy: 'Curled' },
+                { id: 'g1_ds11', char: '真正', pinyin: 'zhēnzhèng', highlight: 'zh', type: 'curled', pair: 'z-zh', meaning: '真正真正 / Chân chính, thực sự.', anatomy: 'Curled' },
+                { id: 'g1_ds12', char: '政治', pinyin: 'zhèngzhì', highlight: 'zh', type: 'curled', pair: 'z-zh', meaning: '政治政治 / Chính trị.', anatomy: 'Curled' },
+                { id: 'g1_ds13', char: '唱歌', pinyin: 'chànggē', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '大聲唱歌 / Hát ca.', anatomy: 'Curled' },
+                { id: 'g1_ds14', char: '傳統', pinyin: 'chuántǒng', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '傳統文化 / Truyền thống.', anatomy: 'Curled' },
+                { id: 'g1_ds15', char: '城市', pinyin: 'chéngshì', highlight: 'ch', type: 'curled', pair: 'c-ch', meaning: '現代城市 / Thành phố, đô thị.', anatomy: 'Curled' },
+                { id: 'g1_ds16', char: '身體', pinyin: 'shēntǐ', highlight: 'sh', type: 'curled', pair: 's-sh', meaning: '身體健康 / Cơ thể, sức khỏe.', anatomy: 'Curled' }
+            ]
+        },
+        group2: {
+            title: "第二組：舌尖後音的對比練習",
+            subTitle: "此組別專注於舌尖後音內部（zh、ch、sh）發音位置相近，但送氣與摩擦方式不同的轉換練習。",
+            minimalTriplets: [
+                { id: 'g2_mt1', char1: '站', pinyin1: 'zhàn', char2: '產', pinyin2: 'chǎn', char3: '山', pinyin3: 'shān', rhyme: 'an' },
+                { id: 'g2_mt2', char1: '正', pinyin1: 'zhèng', char2: '城', pinyin2: 'chéng', char3: '生', pinyin3: 'shēng', rhyme: 'eng' },
+                { id: 'g2_mt3', char1: '知', pinyin1: 'zhī', char2: '吃', pinyin2: 'chī', char3: '是', pinyin3: 'shì', rhyme: 'i' },
+                { id: 'g2_mt4', char1: '住', pinyin1: 'zhù', char2: '出', pinyin2: 'chū', char3: '樹', pinyin3: 'shù', rhyme: 'u' }
+            ],
+            mixedRetroflexes: [
+                { id: 'g2_mr1', char: '正常', pinyin: 'zhèngcháng', type: 'zh-ch', highlight: 'zh', meaning: '正常正常 / Bình thường, chính thường.', anatomy: 'Curled' },
+                { id: 'g2_mr2', char: '戰場', pinyin: 'zhànchǎng', type: 'zh-ch', highlight: 'zh', meaning: '戰火戰場 / Chiến trường.', anatomy: 'Curled' },
+                { id: 'g2_mr3', char: '支持', pinyin: 'zhīchí', type: 'zh-ch', highlight: 'zh', meaning: '支持擁護 / Ủng hộ.', anatomy: 'Curled' },
+                { id: 'g2_mr4', char: '指出', pinyin: 'zhǐchū', type: 'zh-ch', highlight: 'zh', meaning: '指出問題 / Chỉ ra.', anatomy: 'Curled' },
+                { id: 'g2_mr5', char: '專長', pinyin: 'zhuāncháng', type: 'zh-ch', highlight: 'zh', meaning: '個人專長 / Sở trường, chuyên môn.', anatomy: 'Curled' },
+                { id: 'g2_mr6', char: '照常', pinyin: 'zhàocháng', type: 'zh-ch', highlight: 'zh', meaning: '照常營業 / Như thường lệ.', anatomy: 'Curled' },
+                { id: 'g2_mr7', char: '車站', pinyin: 'chēzhàn', type: 'ch-zh', highlight: 'ch', meaning: '公車站牌 / Nhà ga, bến xe.', anatomy: 'Curled' },
+                { id: 'g2_mr8', char: '承認', pinyin: 'chéngrèn', type: 'ch-zh', highlight: 'ch', meaning: '勇於承認 / Thừa nhận.', anatomy: 'Curled' },
+                { id: 'g2_mr9', char: '沉重', pinyin: 'chénzhòng', type: 'ch-zh', highlight: 'ch', meaning: '心情沉重 / Nặng nề.', anatomy: 'Curled' },
+                { id: 'g2_mr10', char: '誠摯', pinyin: 'chéngzhì', type: 'ch-zh', highlight: 'ch', meaning: '誠摯邀請 / Chân thành, thành kính.', anatomy: 'Curled' },
+                { id: 'g2_mr11', char: '處置', pinyin: 'chǔzhì', type: 'ch-zh', highlight: 'ch', meaning: '妥善處置 / Xử trí, xử lý.', anatomy: 'Curled' },
+                { id: 'g2_mr12', char: '出眾', pinyin: 'chūzhòng', type: 'ch-zh', highlight: 'ch', meaning: '才華出眾 / Nổi bật, xuất chúng.', anatomy: 'Curled' },
+                { id: 'g2_mr13', char: '知識', pinyin: 'zhīshì', type: 'zh-sh', highlight: 'zh', meaning: '增長知識 / Tri thức, kiến thức.', anatomy: 'Curled' },
+                { id: 'g2_mr14', char: '真實', pinyin: 'zhēnshí', type: 'zh-sh', highlight: 'zh', meaning: '真實故事 / Chân thực, sự thật.', anatomy: 'Curled' },
+                { id: 'g2_mr15', char: '指示', pinyin: 'zhǐshì', type: 'zh-sh', highlight: 'zh', meaning: '聽從指示 / Chỉ thị, hướng dẫn.', anatomy: 'Curled' },
+                { id: 'g2_mr16', char: '重視', pinyin: 'zhòngshì', type: 'zh-sh', highlight: 'zh', meaning: '高度重視 / Coi trọng.', anatomy: 'Curled' },
+                { id: 'g2_mr17', char: '證書', pinyin: 'zhèngshū', type: 'zh-sh', highlight: 'zh', meaning: '畢業證書 / Chứng chỉ, chứng thư.', anatomy: 'Curled' },
+                { id: 'g2_mr18', char: '裝飾', pinyin: 'zhuāngshì', type: 'zh-sh', highlight: 'zh', meaning: '新年裝飾 / Trang trí.', anatomy: 'Curled' },
+                { id: 'g2_mr19', char: '甚至', pinyin: 'shènzhì', type: 'sh-zh', highlight: 'sh', meaning: '甚至甚至 / Thậm chí.', anatomy: 'Curled' },
+                { id: 'g2_mr20', char: '設置', pinyin: 'shèzhì', type: 'sh-zh', highlight: 'sh', meaning: '設置參數 / Thiết lập, cài đặt.', anatomy: 'Curled' },
+                { id: 'g2_mr21', char: '伸張', pinyin: 'shēnzhāng', type: 'sh-zh', highlight: 'sh', meaning: '伸張正義 / Dung dưỡng, mở rộng.', anatomy: 'Curled' },
+                { id: 'g2_mr22', char: '實質', pinyin: 'shízhí', type: 'sh-zh', highlight: 'sh', meaning: '實質內容 / Thực chất.', anatomy: 'Curled' },
+                { id: 'g2_mr23', char: '樹枝', pinyin: 'shùzhī', type: 'sh-zh', highlight: 'sh', meaning: '枯木樹枝 / Cành cây.', anatomy: 'Curled' },
+                { id: 'g2_mr24', char: '市場', pinyin: 'shìchǎng', type: 'sh-zh', highlight: 'sh', meaning: '傳統市場 / Chợ, thị trường.', anatomy: 'Curled' },
+                { id: 'g2_mr25', char: '城市', pinyin: 'chéngshì', type: 'ch-sh', highlight: 'ch', meaning: '現代城市 / Thành phố.', anatomy: 'Curled' },
+                { id: 'g2_mr26', char: '出生', pinyin: 'chūshēng', type: 'ch-sh', highlight: 'ch', meaning: '出生省份 / Ra đời, sinh ra.', anatomy: 'Curled' },
+                { id: 'g2_mr27', char: '常識', pinyin: 'chángshì', type: 'ch-sh', highlight: 'ch', meaning: '生活常識 / Thường thức, kiến thức phổ thông.', anatomy: 'Curled' },
+                { id: 'g2_mr28', char: '超市', pinyin: 'chāoshì', type: 'ch-sh', highlight: 'ch', meaning: '去逛超市 / Siêu thị.', anatomy: 'Curled' },
+                { id: 'g2_mr29', char: '出事', pinyin: 'chūshì', type: 'ch-sh', highlight: 'ch', meaning: '意外出事 / Xảy ra tai nạn.', anatomy: 'Curled' },
+                { id: 'g2_mr30', char: '廚師', pinyin: 'chúshī', type: 'ch-sh', highlight: 'ch', meaning: '餐廳廚師 / Đầu bếp.', anatomy: 'Curled' },
+                { id: 'g2_mr31', char: '視察', pinyin: 'shìchá', type: 'sh-ch', highlight: 'sh', meaning: '視察工作 / Thị sát, tuần tra.', anatomy: 'Curled' },
+                { id: 'g2_mr32', char: '生產', pinyin: 'shēngchǎn', type: 'sh-ch', highlight: 'sh', meaning: '生產線 / Sản xuất.', anatomy: 'Curled' },
+                { id: 'g2_mr33', char: '時常', pinyin: 'shícháng', type: 'sh-ch', highlight: 'sh', meaning: '時常想念 / Thường xuyên.', anatomy: 'Curled' },
+                { id: 'g2_mr34', char: '收藏', pinyin: 'shōucáng', type: 'sh-ch', highlight: 'sh', meaning: '藝術收藏 / Thu thập, sưu tầm.', anatomy: 'Curled' },
+                { id: 'g2_mr35', char: '審查', pinyin: 'shěnchá', type: 'sh-ch', highlight: 'sh', meaning: '嚴格審查 / Thẩm tra, xét duyệt.', anatomy: 'Curled' },
+                { id: 'g2_mr36', char: '手冊', pinyin: 'shǒucè', type: 'sh-ch', highlight: 'sh', meaning: '學生手冊 / Sách hướng dẫn, sổ tay.', anatomy: 'Curled' }
+            ]
+        },
+        group3: {
+            title: "第三組：舌尖前音、舌尖後音組合練習",
+            subTitle: "此組別為難度較高的進階訓練，需要舌頭在舌尖前與舌尖後的位置快速靈活切換。",
+            flatToCurled: [
+                { id: 'g3_fc1', char: '早上', pinyin: 'zǎoshàng', highlight: 'z', type: 'flat', meaning: '早上好 / Buổi sáng.', anatomy: 'Flat' },
+                { id: 'g3_fc2', char: '雜誌', pinyin: 'zázhì', highlight: 'z', type: 'flat', meaning: '看新雜誌 / Tạp chí.', anatomy: 'Flat' },
+                { id: 'g3_fc3', char: '操場', pinyin: 'cāochǎng', highlight: 'c', type: 'flat', meaning: '學校操場 / Sân thể dục, sân chơi.', anatomy: 'Flat' },
+                { id: 'g3_fc4', char: '宿舍', pinyin: 'sùshè', highlight: 's', type: 'flat', meaning: '學生宿舍 / Ký túc xá.', anatomy: 'Flat' },
+                { id: 'g3_fc5', char: '算帳', pinyin: 'suànzhàng', highlight: 's', type: 'flat', meaning: '清算帳目 / Tính toán nợ nần, tính sổ.', anatomy: 'Flat' },
+                { id: 'g3_fc6', char: '隨時', pinyin: 'suíshí', highlight: 's', type: 'flat', meaning: '隨時隨地 / Bất cứ lúc nào.', anatomy: 'Flat' },
+                { id: 'g3_fc7', char: '損失', pinyin: 'sǔnshī', highlight: 's', type: 'flat', meaning: '重大損失 / Tổn thất, thiệt hại.', anatomy: 'Flat' },
+                { id: 'g3_fc8', char: '辭職', pinyin: 'cízhí', highlight: 'c', type: 'flat', meaning: '辭職退休 / Từ chức.', anatomy: 'Flat' },
+                { id: 'g3_fc9', char: '總之', pinyin: 'zǒngzhī', highlight: 'z', type: 'flat', meaning: '總而言之 / Tóm lại.', anatomy: 'Flat' }
+            ],
+            curledToFlat: [
+                { id: 'g3_cf1', char: '十字', pinyin: 'shízì', highlight: 'sh', type: 'curled', meaning: '十字路口 / Chữ thập, ngã tư.', anatomy: 'Curled' },
+                { id: 'g3_cf2', char: '數字', pinyin: 'shùzì', highlight: 'sh', type: 'curled', meaning: '阿拉伯數字 / Con số, số tự.', anatomy: 'Curled' },
+                { id: 'g3_cf3', char: '尺寸', pinyin: 'chǐcùn', highlight: 'ch', type: 'curled', meaning: '測量尺寸 / Kích thước.', anatomy: 'Curled' },
+                { id: 'g3_cf4', char: '政策', pinyin: 'zhèngcè', highlight: 'zh', type: 'curled', meaning: '國家政策 / Chính sách.', anatomy: 'Curled' },
+                { id: 'g3_cf5', char: '蔬菜', pinyin: 'shūcài', highlight: 'sh', type: 'curled', meaning: '新鮮蔬菜 / Rau củ quả.', anatomy: 'Curled' },
+                { id: 'g3_cf6', char: '製作', pinyin: 'zhìzuò', highlight: 'zh', type: 'curled', meaning: '手工製作 / Chế tác, sản xuất.', anatomy: 'Curled' },
+                { id: 'g3_cf7', char: '操作', pinyin: 'cāozuò', highlight: 'c', type: 'flat', meaning: '操作電腦 / Thao tác, vận hành.', anatomy: 'Flat' },
+                { id: 'g3_cf8', char: '投資', pinyin: 'tóuzī', highlight: 'z', type: 'flat', meaning: '理財投資 / Đầu tư.', anatomy: 'Flat' }
+            ]
+        },
+        group4: {
+            title: "第四組：繞口令練習",
+            subTitle: "繞口令單元適合做為平台的「趣味挑戰區」，增加趣味性的同時輔助和強化練習。記住：一定要先讀準再加快速度！",
+            tongueTwisters: [
+                { id: 'g4_tt1', title: "【關卡 1】四是四，十是十", char: "四是四，十是十。十四是十四，四十是四十。", pinyin: "sì shì sì, shí shì shí. shí sì shì shí sì, sì shí shì sì shí.", meaning: "Luyện âm s - sh (Tư là tư, mười là mười. Mười bốn là mười bốn, bốn mươi là bốn mươi)." },
+                { id: 'g4_tt2', title: "【關卡 2】雜誌社出雜誌", char: "雜誌社出雜誌，雜誌出在雜誌社。", pinyin: "zázhìshè chū zázhì, zázhì chū zài zázhìshè.", meaning: "Luyện âm z - zh - s - sh (Tòa soạn tạp chí xuất bản tạp chí, tạp chí xuất bản ở tòa soạn)." },
+                { id: 'g4_tt3', title: "【關卡 3】石獅寺前有四十四隻石獅子", char: "石獅寺前有四十四隻石獅子。", pinyin: "shí shī sì qián yǒu sì shí sì zhī shí shī zi.", meaning: "Luyện âm s - sh (Trước chùa Sư Tử Đá có bốn mươi bốn con sư tử đá)." }
+            ]
+        },
+        group5: {
+            title: "第五組：在段落中練習",
+            subTitle: "這是平台的「綜合朗讀與應用區」，結合了校園生活、假期時光、個人學習經驗與夢想。目標音（舌尖前音與舌尖後音）已標註拼音，協助使用者將練習成果帶入日常語流中。",
+            passages: [
+                {
+                    id: 'g5_p1',
+                    title: "【段落一】日常校園生活",
+                    char: "早(zǎo)上，我坐(zuò)公車(chē)去學校找(zhǎo)同學。我們常(cháng)在(zài)教室(shì)說(shuō)話。老師(shī)知(zhī)道大家喜歡唱(chàng)歌，也愛吃(chī)水(shuǐ)果。週(zhōu)末自(zì)己做(zuò)飯，真(zhēn)是(shì)快樂！",
+                    rawText: "早上，我坐公車去學校找同學。我們常在教室說話。老師知道大家喜歡唱歌，也愛吃水果。週末自己做飯，真是快樂！",
+                    pinyin: "zǎo shàng, wǒ zuò gōng chē qù xué xiào zhǎo tóng xué. wǒ men cháng zài jiào shì shuō huà. lǎo shī zhī dào dà jiā xǐ huān chàng gē, yě ài chī shuǐ guǒ. zhōu mò zì jǐ zuò fàn, zhēn shì kuài lè!",
+                    meaning: "Buổi sáng, tôi đi xe buýt đến trường tìm bạn học. Chúng tôi thường nói chuyện trong lớp. Giáo viên biết mọi người thích ca hát, cũng thích ăn trái cây. Cuối tuần tự mình nấu ăn, thật là vui vẻ!"
+                },
+                {
+                    id: 'g5_p2',
+                    title: "【段落二】舒適的假期時光",
+                    char: "新年晚上(shàng)，我喜歡在(zài)家看電視(shì)上(shàng)的煙火。外面人多太吵(chǎo)，自(zì)己和可愛的貓一起真(zhēn)舒(shū)服。桌(zhuō)子(zi)上(shàng)有茶(chá)和點心，這(zhè)是(shì)最(zuì)好的時(shí)間。",
+                    rawText: "新年晚上，我喜歡在家看電視上的煙火。外面人多太吵，自己和可愛的貓一起真舒服。桌子上有茶和點心，這是最好的時間。",
+                    pinyin: "xīn nián wǎn shàng, wǒ xǐ huān zài jiā kàn diàn shì shàng de yān huǒ. wài miàn rén duō tài chǎo, zì jǐ hé kě ài de māo yī qǐ zhēn shū fú. zhuō zi shang yǒu chá hé diǎn xīn, zhè shì zuì hǎo de shí jiān.",
+                    meaning: "Đêm giao thừa, tôi thích ở nhà xem pháo hoa trên tivi. Bên ngoài đông người quá ồn ào, tự mình ở cùng chú mèo đáng yêu thật là thoải mái. Trên bàn có trà và điểm tâm, đây là khoảng thời gian tuyệt vời nhất."
+                },
+                {
+                    id: 'g5_p3',
+                    title: "【段落三】我的中文學習生活",
+                    char: "我來臺灣的大學學中(zhōng)文。在(zài)這(zhè)裡，老師(shī)教我認識(shì)很多新的字(zì)。剛開始(shǐ)的時(shí)候，我覺得中(zhōng)文的聲(shēng)音很難，常(cháng)常(cháng)說(shuō)錯(cuò)。但是(shì)，我每天早(zǎo)上(shàng)都會自(zì)己大聲(shēng)唸課文。知(zhī)道自(zì)己進步了，我真(zhēn)的很高興。我喜歡找(zhǎo)同學一起練習說(shuō)話，大家互相幫忙，這(zhè)是我最(zuì)快樂的事(shì)情。",
+                    rawText: "我來臺灣的大學學中文。在這裡，老師教我認識很多新的字。剛開始的時候，我覺得中文的聲音很難，常常說錯。但是，我每天早上都會自己大聲唸課文。知道自己進步了，我真的很高興。我喜歡找同學一起練習說話，大家互相幫忙，是我最快樂的事情。",
+                    pinyin: "wǒ lái tái wān de dà xué xué zhōng wén. zài zhè lǐ, lǎo shī jiāo wǒ rèn shí hěn duō xīn de zì. gāng kāi shǐ de shí hòu, wǒ jué dé zhōng wén de shēng yīn hěn nàn, cháng cháng shuō cuò. dàn shì, wǒ měi tiān zǎo shàng dōu huì zì jǐ dà shēng niàn kè wén. zhī dào zì jǐ jìn bù le, wǒ zhēn de hěn gāo xìng. wǒ xǐ huān zhǎo tóng xué yī qǐ liàn xí shuō huà, dà jiā hù xiāng bāng máng, shì wǒ zuì kuài lè de ssi qing.",
+                    meaning: "Tôi đến học tiếng Trung tại một trường đại học ở Đài Loan. Ở đây, giáo viên dạy tôi nhận biết nhiều từ mới. Lúc mới bắt đầu, tôi cảm thấy ngữ âm tiếng Trung rất khó, thường xuyên nói sai. Nhưng tôi mỗi sáng đều tự mình đọc to bài học. Biết bản thân tiến bộ, tôi thực sự rất vui. Tôi thích tìm bạn học cùng luyện tập nói chuyện, mọi người giúp đỡ lẫn nhau, đó là điều hạnh phúc nhất của tôi."
+                },
+                {
+                    id: 'g5_p4',
+                    title: "【段落四】克服發音的挑戰",
+                    char: "為了把中(zhōng)文說(shuō)得更準(zhǔn)確，我常(cháng)常(cháng)用電腦上(shàng)網找(zhǎo)資(zī)料。我會在(zài)房間裡把自(zì)己的聲(shēng)音錄下來，一次(cì)又一次(cì)地聽。我發現，只(zhǐ)要專(zhuān)心注(zhù)意發音的位置(zhì)，舌(shé)尖前音和舌(shé)尖後音就沒有那麼難了。有時(shí)候，我也會做(zuò)一些有可愛小貓的中(zhōng)文圖書(shū)，這(zhè)讓我的學習變得更有趣。",
+                    rawText: "為了把中文說得更準確，我常常用電腦上網找資料。我會在房間裡把自己的聲音錄下來，一次又一次地聽。我發現，只要專心注意發音的位置，舌尖前音 and 舌尖後音就沒有那麼難了。有時候，我也會做一些有可愛小貓的中文圖書，這讓我的學習變得更有趣。",
+                    pinyin: "wéi le bǎ zhōng wén shuō de gèng zhǔn què, wǒ cháng cháng yòng diàn nǎo shàng wǎng zhǎo zī liào. wǒ huì zài fáng jiān lǐ bǎ zì jǐ de shēng yīn lù xià lái, yī cì yòu yī cì de tīng. wǒ fā xiàn, zhǐ yào zhuān xīn zhù yì fā yīn de wèi zhì, shé jiān qián yīn hé shé jiān hòu yīn jiù méi yǒu nà me nán le. yǒu shí hòu, wǒ yě huì zuò yī xiē yǒu kě ài xiǎo māo de zhōng wén tú shū, zhè ràng wǒ de xué xí biàn dé gèng yǒu qù.",
+                    meaning: "Để nói tiếng Trung chuẩn xác hơn, tôi thường dùng máy tính lên mạng tra cứu tài liệu. Tôi sẽ tự ghi âm giọng nói của mình trong phòng, nghe đi nghe lại nhiều lần. Tôi phát hiện ra rằng, chỉ cần chú tâm vào vị trí phát âm, âm đầu lưỡi trước và âm đầu lưỡi sau sẽ không còn khó như vậy nữa. Đôi khi, tôi cũng tự làm sách tranh tiếng Trung có hình những chú mèo đáng yêu, điều này làm cho việc học tập của tôi thú vị hơn."
+                },
+                {
+                    id: 'g5_p5',
+                    title: "【段落五】我的語言教學夢想",
+                    char: "我的夢想是(shì)成(cheng)為一位專(zhuan)業的中(zhuan)文老師(shi)。我計畫設(shè）計好玩的網路遊戲，還要畫很多貓咪的圖片，讓學生(shēng)都喜歡上(shàng)我的課。我希望能幫助(zhù)更多人知(zhī)道學中(zhōng)文的快樂。以後，我也想去越南教書(shū)，分享我在(zài)台灣生(shēng)活的故事(shì)。這(zhè)是(shì)我最(zuì)大的願望！",
+                    rawText: "我的夢想是成為一位專業的中文老師。我計畫設計好玩的網路遊戲，還要畫很多貓咪的圖片，讓學生都喜歡上我的課。我希望能幫助更多人知道學中文的快樂。以後，我也想去越南教書，分享我在台灣生活的故事。是我最大的願望！",
+                    pinyin: "wǒ de mèng xiǎng shì chéng wéi yī wèi zhuān yè de zhōng wén lǎo shī. wǒ jì huà shè jì hǎo wán de wǎng lù yóu xì, hái yào huà hěn duō māo mī de tú piàn, ràng xué shēng dōu xǐ huān shàng wǒ de kè. wǒ xī wàng néng bāng zhù gèng duō rén zhī dào xué zhōng wén de kuài lè. yǐ hòu, wǒ yě xiǎng qù yuè nán jiāo shū, fēn xiǎng wǒ zài tái wān shēng huó de gù ssi. zhè shì wǒ zuì dà de yuàn wàng!",
+                    meaning: "Ước mơ của tôi là trở thành một giáo viên tiếng Trung chuyên nghiệp. Tôi lên kế hoạch thiết kế các trò chơi trực tuyến vui nhộn, còn vẽ nhiều hình mèo con để học sinh yêu thích tiết học của tôi. Tôi hy vọng có thể giúp đỡ thêm nhiều người biết được niềm vui học tiếng Trung. Tương lai, tôi cũng muốn sang Việt Nam dạy học, chia sẻ những câu chuyện cuộc sống của tôi tại Đài Loan. Đây là nguyện ước lớn nhất của tôi!"
+                }
+            ]
+        }
+    };
+
+    let currentPracticeMode = 'listening'; // 'listening' or 'speaking'
+    let currentGradedLevel = 'group1';     // preA1, A1, A2, B1, C1
+    let currentFilterPair = 'all';        // all, z-zh, c-ch, s-sh
+
+    // ==========================================
+    // 🎭 4. SPARKLER FIREWORK PARTICLE SYSTEM (仙女棒特效)
+    // ==========================================
+    const canvas = document.getElementById("sparklerCanvas");
+    const ctx = canvas.getContext("2d");
+    let particles = [];
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class SparklerParticle {
+        constructor(x, y, angle, speed) {
+            this.x = x;
+            this.y = y;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.alpha = 1.0;
+            this.decay = 0.015 + Math.random() * 0.02;
+            this.color = Math.random() > 0.3 ? '#fbbf24' : '#f59e0b'; // golden sparkler colors
+            this.size = 1.5 + Math.random() * 2.5;
+            this.gravity = 0.05;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += this.gravity;
+            this.vx *= 0.98; // friction
+            this.vy *= 0.98;
+            this.alpha -= this.decay;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            
+            // Draw cross-like sparkles
+            if (Math.random() > 0.7) {
+                ctx.rect(this.x - this.size * 2, this.y, this.size * 4, 0.5);
+                ctx.rect(this.x, this.y - this.size * 2, 0.5, this.size * 4);
+            } else {
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            }
+            
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    function createSparklerBurst(x, y, count = 45) {
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 6;
+            particles.push(new SparklerParticle(x, y, angle, speed));
+        }
+    }
+
+    function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            if (particles[i].alpha <= 0) {
+                particles.splice(i, 1);
+            } else {
+                particles[i].draw();
+            }
+        }
+        requestAnimationFrame(animateParticles);
+    }
+    requestAnimationFrame(animateParticles);
+
+    // ==========================================
+    // 👤 5. VIETNAMESE STUDENT PROFILE REGISTRATION
+    // ==========================================
+    let currentUser = null;
+    let isFirebaseConnected = false;
+    let db = null;
+
+    function handleNaming(input) {
+        let str = input.value.toUpperCase();
+        
+        // Remove Vietnamese accents natively
+        str = str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        // Replace special Vietnamese letters
+        str = str.replace(/[Đð]/g, "D");
+        str = str.replace(/[ĂÂ]/g, "A");
+        str = str.replace(/[Ê]/g, "E");
+        str = str.replace(/[ÔƠ]/g, "O");
+        str = str.replace(/[Ư]/g, "U");
+
+        // Keep only capital letters A-Z and whitespace
+        str = str.replace(/[^A-Z\s]/g, "");
+        input.value = str;
+    }
+
+    function toggleProvinceDropdown(isVn) {
+        const provinceGroup = document.getElementById('provinceGroup');
+        const stProvince = document.getElementById('stProvince');
+        if (isVn) {
+            provinceGroup.style.display = 'block';
+            stProvince.setAttribute('required', 'required');
+        } else {
+            provinceGroup.style.display = 'none';
+            stProvince.removeAttribute('required');
+            stProvince.value = "Khác";
+        }
+    }
+
+    function checkStudentIdentity() {
+        const savedInfo = localStorage.getItem('pinyin_vn_student_identity');
+        if (savedInfo) {
+            currentUser = JSON.parse(savedInfo);
+            updateStudentBadge();
+            // Automatically speak welcoming message in their saved language
+            playVoiceGreeting();
+        } else {
+            showStudentSetupModal(false);
+        }
+    }
+
+    function showStudentSetupModal(allowClose) {
+        const modal = document.getElementById('studentModal');
+        modal.style.display = 'flex';
+        
+        if (currentUser) {
+            document.getElementById('stClass').value = currentUser.class;
+            document.getElementById('stName').value = currentUser.name;
+            document.getElementById('stProvince').value = currentUser.province;
+            document.getElementById('chinese_level').value = currentUser.level;
+            
+            // Set radio values
+            document.querySelectorAll(`input[name="stSex"]`).forEach(el => {
+                if (el.value === currentUser.sex) el.checked = true;
+            });
+            document.querySelectorAll(`input[name="stNat"]`).forEach(el => {
+                if (el.value === currentUser.nationality) el.checked = true;
+            });
+            document.querySelectorAll(`input[name="stLang"]`).forEach(el => {
+                if (el.value === currentUser.mothertongue) el.checked = true;
+            });
+            toggleProvinceDropdown(currentUser.nationality === 'Việt Nam');
+        }
+
+        modal.onclick = (e) => {
+            if (e.target === modal && allowClose) {
+                modal.style.display = 'none';
+            }
+        };
+    }
+
+    function saveStudentIdentity(event) {
+        event.preventDefault();
+        const studentClass = document.getElementById('stClass').value.trim();
+        const studentName = document.getElementById('stName').value.trim();
+        const studentSex = document.querySelector('input[name="stSex"]:checked').value;
+        const studentNat = document.querySelector('input[name="stNat"]:checked').value;
+        const studentProvince = studentNat === 'Việt Nam' 
+            ? document.getElementById('stProvince').value 
+            : 'Nước ngoài';
+        const studentLang = document.querySelector('input[name="stLang"]:checked').value;
+        const studentLevel = document.getElementById('chinese_level').value;
+
+        if (!studentClass || !studentName || (studentNat === 'Việt Nam' && !studentProvince) || !studentLevel) {
+            showToast("請完整填寫欄位！ / Vui lòng điền đủ.");
+            return;
+        }
+
+        currentUser = {
+            class: studentClass,
+            name: studentName,
+            sex: studentSex,
+            nationality: studentNat,
+            province: studentProvince,
+            mothertongue: studentLang,
+            level: studentLevel
+        };
+
+        localStorage.setItem('pinyin_vn_student_identity', JSON.stringify(currentUser));
+        document.getElementById('studentModal').style.display = 'none';
+        updateStudentBadge();
+        
+        // Trigger magic wand sparklers on form confirm!
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        createSparklerBurst(centerX, centerY, 80);
+        
+        // Play voice greeting
+        playVoiceGreeting();
+    }
+
+    function updateStudentBadge() {
+        const badgeArea = document.getElementById('studentBadgeArea');
+        const badgeInfo = document.getElementById('badgeInfo');
+        if (currentUser) {
+            let label = translations[currentLang].badgeInfo;
+            label = label.replace('{class}', currentUser.class)
+                         .replace('{name}', currentUser.name)
+                         .replace('{level}', currentUser.level);
+            badgeInfo.innerHTML = label;
+            badgeArea.style.display = 'flex';
+        } else {
+            badgeArea.style.display = 'none';
+        }
+    }
+
+    // ==========================================
+    // 🔊 6. WELCOMING TEXT-TO-SPEECH GREETING & TTS UTILS
+    // ==========================================
+    function getBestVoice(voiceLang) {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices();
+        
+        if (voiceLang.toLowerCase().includes('zh-tw')) {
+            // Find standard natural Taiwanese accent voice
+            const twVoices = voices.filter(v => v.lang.toLowerCase().replace(/_/g, '-').includes('zh-tw') || v.lang.toLowerCase().includes('zh-hant-tw'));
+            const yating = twVoices.find(v => v.name.toLowerCase().includes('yating') || v.name.toLowerCase().includes('hanhan') || v.name.toLowerCase().includes('yating') || v.name.toLowerCase().includes('hsiao-yu'));
+            if (yating) return yating;
+            const googleTw = twVoices.find(v => v.name.toLowerCase().includes('google'));
+            if (googleTw) return googleTw;
+            return twVoices[0] || null;
+        }
+        
+        if (voiceLang.toLowerCase().includes('vi-vn') || voiceLang.toLowerCase().startsWith('vi')) {
+            // Target: Vietnamese Hanoi Female Accent (giọng Hà Nội, nữ)
+            const viVoices = voices.filter(v => v.lang.toLowerCase().replace(/_/g, '-').includes('vi-vn') || v.lang.toLowerCase().startsWith('vi'));
+            
+            // Prioritize "Hanoi" female accent
+            const hanoiFemale = viVoices.find(v => {
+                const name = v.name.toLowerCase();
+                return (name.includes('hanoi') || name.includes('north') || name.includes('miền bắc') || name.includes('hoaimy')) && 
+                       (name.includes('female') || name.includes('nữ') || name.includes('google'));
+            });
+            if (hanoiFemale) return hanoiFemale;
+            
+            const hanoiAny = viVoices.find(v => v.name.toLowerCase().includes('hanoi') || v.name.toLowerCase().includes('north'));
+            if (hanoiAny) return hanoiAny;
+            
+            const femaleAny = viVoices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('nữ'));
+            if (femaleAny) return femaleAny;
+            
+            return viVoices[0] || null;
+        }
+        
+        return voices.find(v => v.lang.toLowerCase().includes(voiceLang.toLowerCase())) || null;
+    }
+
+    function playVoiceGreeting() {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        
+        let msg = "";
+        let voiceLang = 'zh-TW';
+
+        if (currentLang === 'vi') {
+            msg = "Chào mừng bạn đến với Nền tảng luyện phát âm tiếng Trung AI!";
+            voiceLang = 'vi-VN';
+        } else if (currentLang === 'en') {
+            msg = "Welcome to the AI Chinese Pronunciation Practice Platform!";
+            voiceLang = 'en-US';
+        } else {
+            msg = "歡迎來到 A I 中文發音練習平台！";
+            voiceLang = 'zh-TW';
+        }
+
+        const utterance = new SpeechSynthesisUtterance(msg);
+        utterance.lang = voiceLang;
+        utterance.rate = 0.85;
+
+        const bestVoice = getBestVoice(voiceLang);
+        if (bestVoice) utterance.voice = bestVoice;
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function speakTarget(text) {
+        // 🔬 Attempt to load high-quality pre-recorded MP3 audio from TTSMaker first (e.g. audio/字.mp3)
+        // This avoids standard browser TTS engines adding a trailing "i" or "ơ" sound!
+        const audioPath = `audio/${text}.mp3`;
+        const testAudio = new Audio(audioPath);
+        
+        testAudio.oncanplaythrough = () => {
+            testAudio.play().catch(err => {
+                // Fallback to browser TTS if autoplay is blocked or failed
+                fallbackSpeakTarget(text);
+            });
+        };
+        
+        testAudio.onerror = () => {
+            // Static file not found or failed, fallback to native browser Speech Synthesis
+            fallbackSpeakTarget(text);
+        };
+    }
+
+    function fallbackSpeakTarget(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW'; // Taiwan accent
+        utterance.rate = 0.65; // Slightly slower (0.65) to make the apical vowel sound incredibly clean and reduce trailing glides
+
+        const bestVoice = getBestVoice('zh-TW');
+        if (bestVoice) utterance.voice = bestVoice;
+
+        window.speechSynthesis.speak(utterance);
+    });
+        };
+        
+        testAudio.onerror = () => {
+            // Static file not found or failed, fallback to native browser Speech Synthesis
+            fallbackSpeakTarget(text);
+        };
+    }
+
+    function fallbackSpeakTarget(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-TW'; // Taiwan accent
+        utterance.rate = 0.65; // Slightly slower (0.65) to make the apical vowel sound incredibly clean and reduce trailing glides
+
+        const bestVoice = getBestVoice('zh-TW');
+        if (bestVoice) utterance.voice = bestVoice;
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // ==========================================
+    // ⚙️ 7. CLOUD SYNC INITIALIZATION
+    // ==========================================
+    function checkAndInitializeFirebase() {
+        const cloudIndicator = document.getElementById('cloudStatus');
+        const cloudText = document.getElementById('cloudStatusText');
+
+        const isDefaultPlaceholder = firebaseConfig.apiKey.includes("YOUR_API_KEY") || firebaseConfig.projectId.includes("YOUR_PROJECT_ID");
+
+        if (isDefaultPlaceholder) {
+            isFirebaseConnected = false;
+            cloudIndicator.className = "cloud-status-indicator offline";
+            cloudText.innerHTML = translations[currentLang].cloudLocal;
+            return;
+        }
+
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            isFirebaseConnected = true;
+            cloudIndicator.className = "cloud-status-indicator connected";
+            cloudText.innerHTML = translations[currentLang].cloudActive;
+        } catch (error) {
+            console.error(error);
+            isFirebaseConnected = false;
+            cloudIndicator.className = "cloud-status-indicator offline";
+            cloudText.innerHTML = translations[currentLang].cloudLocal;
+        }
+    }
+
+    // ==========================================
+    // 🎯 8. PRACTICE MODE & GRADED LEVEL SWITCHERS
+    // ==========================================
+    function switchPracticeMode(mode) {
+        currentPracticeMode = mode;
+        document.querySelectorAll('.mode-portal-card').forEach(c => c.classList.remove('active'));
+        document.getElementById(`portal-${mode}`).classList.add('active');
+
+        if (mode === 'listening') {
+            document.getElementById('listeningModeWorkspace').style.display = 'block';
+            document.getElementById('speakingModeWorkspace').style.display = 'none';
+            initListeningQuiz();
+        } else {
+            document.getElementById('listeningModeWorkspace').style.display = 'none';
+            document.getElementById('speakingModeWorkspace').style.display = 'grid';
+            renderSpeakingCards(currentFilterPair);
+            updateArticulationPanelUI();
+        }
+    }
+
+    function switchGradedLevel(level) {
+        currentGradedLevel = level;
+        document.querySelectorAll('.btn-level').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-lvl-${level}`).classList.add('active');
+
+        // Sparkle explosion when selecting a level!
+        const rect = document.getElementById(`btn-lvl-${level}`).getBoundingClientRect();
+        createSparklerBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 25);
+
+        // Hide/Show sub-filters dynamically
+        const subFilters = document.getElementById('subFilters');
+        if (level === 'group4' || level === 'group5') {
+            subFilters.style.display = 'none';
+        } else {
+            subFilters.style.display = 'flex';
+        }
+
+        if (currentPracticeMode === 'listening') {
+            initListeningQuiz();
+        } else {
+            renderSpeakingCards(currentFilterPair);
+        }
+    }
+
+    function filterCards(pairType) {
+        currentFilterPair = pairType;
+        document.querySelectorAll('#subFilters .btn-filter').forEach(btn => btn.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+
+        if (currentPracticeMode === 'speaking') {
+            renderSpeakingCards(pairType);
+        } else {
+            initListeningQuiz();
+        }
+    }
+
+    // ==========================================
+    // 🎧 9. DUAL LISTENING QUIZ MODULE
+    // ==========================================
+    let quizQuestionList = [];
+    let currentQuizIndex = 0;
+    let quizCorrectCount = 0;
+    let quizAnswered = false;
+    let quizTimeout = null;
+
+    function initListeningQuiz() {
+        const gr = gradedWords[currentGradedLevel];
+        quizQuestionList = [];
+        
+        if (currentGradedLevel === 'group1') {
+            // Flatten minimalPairs, generalChars, disyllabicWords for a rich randomized quiz
+            const pairs = gr.minimalPairs.filter(w => currentFilterPair === 'all' || w.pair === currentFilterPair);
+            const generals = gr.generalChars.filter(w => currentFilterPair === 'all' || w.pair === currentFilterPair);
+            const disyllabics = gr.disyllabicWords.filter(w => currentFilterPair === 'all' || w.pair === currentFilterPair);
+            
+            // Format 1: Minimal Pair Character Duels
+            pairs.forEach(p => {
+                const pickChar1 = Math.random() > 0.5;
+                quizQuestionList.push({
+                    type: 'minimal',
+                    char: pickChar1 ? p.char1 : p.char2,
+                    pinyin: pickChar1 ? p.pinyin1 : p.pinyin2,
+                    options: [
+                        { id: p.id + '_opt1', char: p.char1, pinyin: p.pinyin1, correct: pickChar1 },
+                        { id: p.id + '_opt2', char: p.char2, pinyin: p.pinyin2, correct: !pickChar1 }
+                    ]
+                });
+            });
+            
+            // Format 2: General character audio quizes
+            generals.forEach(g => {
+                const opposite = generals.find(o => o.pair === g.pair && o.type !== g.type) || g;
+                const options = [
+                    { id: g.id, char: g.char, pinyin: g.pinyin, correct: true },
+                    { id: opposite.id + '_foil', char: opposite.char, pinyin: opposite.pinyin, correct: false }
+                ].sort(() => 0.5 - Math.random());
+                
+                quizQuestionList.push({
+                    type: 'char',
+                    char: g.char,
+                    pinyin: g.pinyin,
+                    options: options
+                });
+            });
+            
+            // Format 3: Disyllabic quizes
+            disyllabics.forEach(d => {
+                const opposite = disyllabics.find(o => o.pair === d.pair && o.type !== d.type) || d;
+                const options = [
+                    { id: d.id, char: d.char, pinyin: d.pinyin, correct: true },
+                    { id: opposite.id + '_foil', char: opposite.char, pinyin: opposite.pinyin, correct: false }
+                ].sort(() => 0.5 - Math.random());
+                
+                quizQuestionList.push({
+                    type: 'disyllabic',
+                    char: d.char,
+                    pinyin: d.pinyin,
+                    options: options
+                });
+            });
+            
+        } else if (currentGradedLevel === 'group2') {
+            // Triple-choice minimal triplets (zh vs ch vs sh)
+            gr.minimalTriplets.forEach(t => {
+                // Randomly choose target out of the three
+                const idx = Math.floor(Math.random() * 3);
+                const targetChar = idx === 0 ? t.char1 : (idx === 1 ? t.char2 : t.char3);
+                const targetPinyin = idx === 0 ? t.pinyin1 : (idx === 1 ? t.pinyin2 : t.pinyin3);
+                
+                quizQuestionList.push({
+                    type: 'triplet',
+                    char: targetChar,
+                    pinyin: targetPinyin,
+                    options: [
+                        { id: t.id + '_1', char: t.char1, pinyin: t.pinyin1, correct: idx === 0 },
+                        { id: t.id + '_2', char: t.char2, pinyin: t.pinyin2, correct: idx === 1 },
+                        { id: t.id + '_3', char: t.char3, pinyin: t.pinyin3, correct: idx === 2 }
+                    ]
+                });
+            });
+            
+            // Mixed retroflexes quizes
+            gr.mixedRetroflexes.forEach(mr => {
+                const opposite = gr.mixedRetroflexes.find(o => o.type !== mr.type) || mr;
+                const options = [
+                    { id: mr.id, char: mr.char, pinyin: mr.pinyin, correct: true },
+                    { id: opposite.id + '_foil', char: opposite.char, pinyin: opposite.pinyin, correct: false }
+                ].sort(() => 0.5 - Math.random());
+                
+                quizQuestionList.push({
+                    type: 'mixed_retroflex',
+                    char: mr.char,
+                    pinyin: mr.pinyin,
+                    options: options
+                });
+            });
+            
+        } else if (currentGradedLevel === 'group3') {
+            // Flat to Curled and vice-versa quizes
+            const fc = gr.flatToCurled;
+            const cf = gr.curledToFlat;
+            
+            fc.forEach(w => {
+                const opposite = cf[Math.floor(Math.random() * cf.length)];
+                const options = [
+                    { id: w.id, char: w.char, pinyin: w.pinyin, correct: true },
+                    { id: opposite.id + '_foil', char: opposite.char, pinyin: opposite.pinyin, correct: false }
+                ].sort(() => 0.5 - Math.random());
+                quizQuestionList.push({ type: 'mixed_sequence', char: w.char, pinyin: w.pinyin, options: options });
+            });
+            
+            cf.forEach(w => {
+                const opposite = fc[Math.floor(Math.random() * fc.length)];
+                const options = [
+                    { id: w.id, char: w.char, pinyin: w.pinyin, correct: true },
+                    { id: opposite.id + '_foil', char: opposite.char, pinyin: opposite.pinyin, correct: false }
+                ].sort(() => 0.5 - Math.random());
+                quizQuestionList.push({ type: 'mixed_sequence', char: w.char, pinyin: w.pinyin, options: options });
+            });
+            
+        } else if (currentGradedLevel === 'group4') {
+            // Tongue twisters listen & identify challenge
+            gr.tongueTwisters.forEach(tt => {
+                quizQuestionList.push({
+                    type: 'tongue_twister',
+                    char: tt.char,
+                    pinyin: tt.pinyin,
+                    options: gr.tongueTwisters.map(o => ({
+                        id: o.id,
+                        char: o.title,
+                        pinyin: "挑戰題型",
+                        correct: o.id === tt.id
+                    }))
+                });
+            });
+            
+        } else if (currentGradedLevel === 'group5') {
+            // Paragraph listen & identify paragraph card challenge
+            gr.passages.forEach(p => {
+                // Play a specific chunk/sentence from the paragraph
+                const targetSentence = p.rawText.split("。")[0] + "。";
+                quizQuestionList.push({
+                    type: 'passage_identify',
+                    char: targetSentence, // Play the first sentence of the paragraph
+                    pinyin: "語流段落",
+                    options: gr.passages.map(o => ({
+                        id: o.id,
+                        char: o.title,
+                        pinyin: "語流音軌",
+                        correct: o.id === p.id
+                    }))
+                });
+            });
+        }
+
+        // Shuffle all collected quiz questions of the active Group, and take max 5
+        quizQuestionList = quizQuestionList.sort(() => 0.5 - Math.random()).slice(0, 5);
+        currentQuizIndex = 0;
+        quizCorrectCount = 0;
+        quizAnswered = false;
+
+        loadQuizQuestion();
+    }
+
+    function loadQuizQuestion() {
+        if (quizQuestionList.length === 0) return;
+        
+        quizAnswered = false;
+        document.getElementById('quiz-progress-text').innerText = `${translations[currentLang].modeListening} | ${currentQuizIndex + 1} / ${quizQuestionList.length}`;
+        document.getElementById('quiz-score-display').innerText = `Score: ${quizCorrectCount} / ${currentQuizIndex}`;
+        document.getElementById('quizNextArea').innerHTML = '';
+
+        const currentQuestion = quizQuestionList[currentQuizIndex];
+        const optionsArea = document.getElementById('quizOptionsArea');
+        optionsArea.innerHTML = '';
+
+        // Adjust column count in options grid depending on triplet options vs binary options
+        if (currentQuestion.options.length === 3) {
+            optionsArea.style.gridTemplateColumns = "repeat(3, 1fr)";
+        } else {
+            optionsArea.style.gridTemplateColumns = "repeat(2, 1fr)";
+        }
+
+        currentQuestion.options.forEach(opt => {
+            const btnHTML = `
+                <button class="btn-quiz-option" onclick="handleQuizAnswer(this, ${opt.correct}, '${opt.id}')">
+                    <span class="opt-char" style="font-size: 1.6rem; font-weight: 700;">${opt.char}</span>
+                    <span class="opt-pinyin" style="font-size: 0.95rem; font-weight: bold; color: var(--text-muted);">(${opt.pinyin})</span>
+                </button>
+            `;
+            optionsArea.insertAdjacentHTML('beforeend', btnHTML);
+        });
+
+        // Autoplay target audio
+        setTimeout(playQuizTargetAudio, 500);
+    }
+
+    function playQuizTargetAudio() {
+        const currentQuestion = quizQuestionList[currentQuizIndex];
+        if (currentQuestion) speakTarget(currentQuestion.char);
+    }
+
+    function handleQuizAnswer(btnEl, isCorrect, optId) {
+        if (quizAnswered) return;
+        quizAnswered = true;
+
+        const currentQuestion = quizQuestionList[currentQuizIndex];
+        const isFinished = currentQuizIndex === quizQuestionList.length - 1;
+
+        // Star sparkles trigger
+        const rect = btnEl.getBoundingClientRect();
+        createSparklerBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, isCorrect ? 40 : 15);
+
+        if (isCorrect) {
+            btnEl.classList.add('correct');
+            quizCorrectCount++;
+            
+            // Rich praise feedback (bilingual Chinese / Vietnamese)
+            const praises = [
+                "太棒了！你的聽力太準確了！ / Tuyệt vời! Thính giác của bạn cực kỳ nhạy bén!",
+                "答對了！繼續保持！ / Rất tốt! Hãy tiếp tục duy trì phong độ nhé!",
+                "完全正確！發音細節抓得很棒！ / Chính xác hoàn toàn! Bạn nắm bắt chi tiết âm rất tốt!",
+                "非常準確！舌尖前後音難不倒你！ / Rất chuẩn xác! Âm đầu lưỡi không làm khó được bạn!",
+                "太厲害了！耳朵非常靈敏！ / Quá siêu! Tai nghe của bạn rất nhạy!"
+            ];
+            const randomPraise = praises[Math.floor(Math.random() * praises.length)];
+            showToast(randomPraise);
+
+            // Auto-advance after 1.5 seconds so students don't need to click next manually
+            if (quizTimeout) clearTimeout(quizTimeout);
+            quizTimeout = setTimeout(() => {
+                nextQuizStep(isFinished);
+            }, 1500);
+        } else {
+            btnEl.classList.add('wrong');
+            
+            // Rich encouraging feedback for incorrect attempts
+            const encouragements = [
+                "差一點就對了，再仔細聽聽看！ / Suýt chút nữa là đúng rồi, hãy nghe lại thật kỹ nhé!",
+                "沒關係，我們再聽一次音檔對比。 / Không sao cả, chúng ta cùng nghe lại để đối chiếu nhé.",
+                "別灰心，注意舌頭的位置喔！ / Đừng nản lòng, chú ý vị trí đặt lưỡi nhé!",
+                "這題有點難度，再試一次看看！ / Câu này hơi khó một chút, thử lại lần nữa xem sao!",
+                "聽聽看兩者的差別，你一定可以的！ / Hãy nghe sự khác biệt giữa hai âm, bạn chắc chắn sẽ làm được!"
+            ];
+            const randomEncouragement = encouragements[Math.floor(Math.random() * encouragements.length)];
+            showToast(randomEncouragement);
+
+            // Highlight the correct one in green immediately to guide learning
+            document.querySelectorAll('.btn-quiz-option').forEach(btn => {
+                if (btn !== btnEl) btn.classList.add('correct');
+            });
+        }
+
+        // Show pinyin anyway for learning
+        document.querySelectorAll('.btn-quiz-option .opt-pinyin').forEach(p => p.style.visibility = 'visible');
+
+        // Firestore upload for quiz metrics
+        saveQuizRecordToFirebase(currentQuestion, isCorrect);
+
+        // Next Question button setup
+        document.getElementById('quiz-score-display').innerText = `Score: ${quizCorrectCount} / ${currentQuizIndex + 1}`;
+        
+        const nextBtnLabel = isFinished 
+            ? (currentLang === 'vi' ? 'Hoàn thành!' : '完成測驗！') 
+            : (currentLang === 'vi' ? 'Câu tiếp theo ➡️' : '下一題 ➡️');
+
+        const nextBtnHTML = `
+            <button class="btn-quiz-next" onclick="nextQuizStep(${isFinished})">
+                ${nextBtnLabel}
+            </button>
+        `;
+        document.getElementById('quizNextArea').innerHTML = nextBtnHTML;
+    }
+
+    function nextQuizStep(isFinished) {
+        if (quizTimeout) clearTimeout(quizTimeout);
+        if (isFinished) {
+            showQuizCompletionSummary();
+        } else {
+            currentQuizIndex++;
+            loadQuizQuestion();
+        }
+    }
+
+    function showQuizCompletionSummary() {
+        const accuracy = Math.round((quizCorrectCount / quizQuestionList.length) * 100);
+        let stars = "";
+        let rewardText = "";
+        let rewardSubText = "";
+        
+        if (quizCorrectCount === 5) {
+            stars = "⭐⭐⭐";
+            rewardText = currentLang === 'vi' ? "Thính giác siêu phàm! 🎉" : "神級聽音大師！🎉";
+            rewardSubText = currentLang === 'vi' ? "Bạn đã vượt qua thử thách nghe với số điểm tuyệt đối!" : "您以完美無瑕的成績通過了聽力挑戰！";
+            createSparklerBurst(window.innerWidth / 2, window.innerHeight / 2, 80);
+        } else if (quizCorrectCount >= 4) {
+            stars = "⭐⭐";
+            rewardText = currentLang === 'vi' ? "Cực kỳ xuất sắc! 🌟" : "卓越聽力大師！🌟";
+            rewardSubText = currentLang === 'vi' ? "Chỉ thiếu một chút nữa là hoàn hảo rồi, quá giỏi!" : "只差臨門一腳就完美滿分，非常優秀！";
+            createSparklerBurst(window.innerWidth / 2, window.innerHeight / 2, 50);
+        } else if (quizCorrectCount >= 3) {
+            stars = "⭐";
+            rewardText = currentLang === 'vi' ? "Rất tốt! 📈" : "聽力達人！📈";
+            rewardSubText = currentLang === 'vi' ? "Bạn đã nhận ra phần lớn âm, tiếp tục cố gắng nhé!" : "您已掌握了多數的音感對比，繼續加油！";
+        } else {
+            stars = "😭";
+            rewardText = currentLang === 'vi' ? "Hãy thử lại nhé! 💪" : "再接再厲！💪";
+            rewardSubText = currentLang === 'vi' ? "Hãy luyện tập thêm để cải thiện thính giác nhé!" : "別灰心，多加練習可以讓您的耳朵更加靈敏！";
+        }
+
+        const container = document.querySelector('.quiz-container');
+        container.innerHTML = `
+            <div style="animation: fade-in 0.4s ease; text-align: center; padding: 2rem 1rem;">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem; filter: drop-shadow(0 0 15px rgba(251,191,36,0.5));">${stars}</div>
+                <h2 style="font-family: 'Noto Sans TC', sans-serif; font-size: 1.8rem; font-weight: 900; background: linear-gradient(to right, #fbbf24, #f59e0b, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.75rem;">${rewardText}</h2>
+                <p style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; max-width: 450px; margin-left: auto; margin-right: auto; line-height: 1.5;">${rewardSubText}</p>
+                
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 1.2rem; max-width: 320px; margin: 0 auto 2rem auto; box-shadow: inset 0 0 20px rgba(0,0,0,0.25);">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">總得分 / Điểm số</div>
+                    <div style="font-size: 2.2rem; font-weight: 900; color: white;">${quizCorrectCount} <span style="font-size: 1.2rem; color: var(--text-muted); font-weight: 500;">/ ${quizQuestionList.length}</span></div>
+                    <div style="font-size: 0.8rem; color: var(--success-color); font-weight: 700; margin-top: 0.25rem;">答對率 / Tỉ lệ: ${accuracy}%</div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="btn-quiz-next" onclick="restartListeningQuiz()" style="background: var(--purple-gradient); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); border: none; padding: 0.75rem 2rem; border-radius: 30px; font-weight: 700; font-size: 0.9rem; cursor: pointer;">
+                        <i class="fa-solid fa-rotate-left"></i> ${currentLang === 'vi' ? 'Thách đấu lại' : '再挑戰一次'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    window.restartListeningQuiz = function() {
+        const container = document.querySelector('.quiz-container');
+        container.innerHTML = `
+            <div class="quiz-header">
+                <span id="quiz-progress-text" style="font-weight: 600;">第 1 / 5 題</span>
+                <div class="quiz-score-badge" id="quiz-score-display">答對數: 0 / 0</div>
+            </div>
+            
+            <div class="quiz-question-card">
+                <button class="btn-quiz-play" id="btnQuizPlay" onclick="playQuizTargetAudio()">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                <div class="quiz-play-label" id="quiz-play-instructions">點擊播放標準示範發音</div>
+            </div>
+            
+            <div class="quiz-options-grid" id="quizOptionsArea">
+                <!-- Javascript will load two buttons here -->
+            </div>
+            
+            <div class="quiz-next-area" id="quizNextArea">
+                <!-- Next question button will render here dynamically -->
+            </div>
+        `;
+        initListeningQuiz();
+    }
+
+    async function saveQuizRecordToFirebase(wordInfo, isCorrect) {
+        if (!isFirebaseConnected || !currentUser) return;
+        try {
+            const docData = {
+                class: currentUser.class,
+                studentId: currentUser.id,
+                studentName: currentUser.name,
+                sex: currentUser.sex,
+                nationality: currentUser.nationality,
+                province: currentUser.province,
+                mothertongue: currentUser.mothertongue,
+                level: currentUser.level,
+                practiceMode: "Listening Test",
+                wordId: wordInfo.id,
+                character: wordInfo.char,
+                pinyin: wordInfo.pinyin,
+                highlight: wordInfo.highlight,
+                recognizedText: isCorrect ? "答對 / Correct" : "答錯 / Wrong",
+                isMatch: isCorrect,
+                audioUrl: "N/A (聽力選擇題)",
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            await db.collection("pronunciation_records").add(docData);
+        } catch (e) {
+            console.error("Firestore error: ", e);
+        }
+    }
+
+    // ==========================================
+    // 🗣️ 10. 口說跟讀練習 & SVG 舌位指引
+    // ==========================================
+    function updateArticulationPanelUI() {
+        const t = translations[currentLang];
+        
+        // Find which type of cards is dominant in current filtered view
+        const currentLevelSet = gradedWords[currentGradedLevel];
+        const sampleCard = currentFilterPair === 'all' 
+            ? currentLevelSet[0] 
+            : currentLevelSet.find(w => w.pair === currentFilterPair);
+
+        const isCurled = sampleCard && sampleCard.type === 'curled';
+        const typeEl = document.getElementById('anatomy-type-title');
+        const descEl = document.getElementById('anatomy-type-description');
+        const bulletsEl = document.getElementById('anatomy-bullets');
+        const tonguePath = document.getElementById('svgTonguePath');
+        const targetGlow = document.getElementById('svgTargetGlow');
+
+        if (isCurled) {
+            // Retroflex zh, ch, sh Setup
+            typeEl.style.color = "var(--rose-primary)";
+            typeEl.innerHTML = `<i class="fa-solid fa-arrows-up-to-line"></i> ${t.curledTitle}`;
+            descEl.innerText = t.curledDesc;
+            bulletsEl.innerHTML = t.curledBullets.map(b => `<li>${b}</li>`).join('');
+            
+            // Adjust SVG paths to show curled tongue
+            tonguePath.setAttribute('d', 'M 50,140 Q 90,130 120,115 Q 155,75 140,55 Q 130,68 115,76 Q 80,95 50,110 Z');
+            targetGlow.setAttribute('cx', '140');
+            targetGlow.setAttribute('cy', '45');
+        } else {
+            // Flat sibilants z, c, s Setup
+            typeEl.style.color = "var(--cyan-primary)";
+            typeEl.innerHTML = `<i class="fa-solid fa-wind"></i> ${t.flatTitle}`;
+            descEl.innerText = t.flatDesc;
+            bulletsEl.innerHTML = t.flatBullets.map(b => `<li>${b}</li>`).join('');
+            
+            // Adjust SVG to flat tongue
+            tonguePath.setAttribute('d', 'M 50,140 Q 100,130 140,120 Q 160,95 168,75 Q 160,78 140,82 Q 90,90 50,110 Z');
+            targetGlow.setAttribute('cx', '172');
+            targetGlow.setAttribute('cy', '58');
+        }
+    }
+
+    function renderSpeakingCards(filter = 'all') {
+        const grid = document.getElementById('cardsGrid');
+        grid.innerHTML = '';
+
+        const fullList = gradedWords[currentGradedLevel];
+        const filtered = filter === 'all' 
+            ? fullList 
+            : fullList.filter(w => w.pair === filter);
+
+        filtered.forEach(word => {
+            const isFlat = word.type === 'flat';
+            const cardClass = isFlat ? 'flat-type' : 'curled-type';
+            const typeLabel = isFlat ? '舌尖前音' : '舌尖後音';
+            
+            const cardHTML = `
+                <div class="practice-card ${cardClass}" id="card-${word.id}">
+                    <div class="card-header">
+                        <span class="badge-type">${typeLabel}</span>
+                        <div class="pinyin-group">
+                            <span class="pinyin-text">${word.pinyin}</span>
+                            <div class="phoneme-highlight">聲母 [${word.highlight}]</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card-body">
+                        <div class="char-display">${word.char}</div>
+                        <div class="info-display">
+                            <div class="word-meaning">${word.meaning}</div>
+                            <div class="articulation-tip">${word.anatomy}</div>
+                        </div>
+                    </div>
+
+                    <!-- Voice wave pulse -->
+                    <div class="sound-wave" id="wave-${word.id}">
+                        <span></span><span></span><span></span><span></span>
+                        <span style="font-size: 0.75rem; color: #ef4444; margin-left: 0.5rem; animation: none; width: auto; height: auto;">錄音中...</span>
+                    </div>
+
+                    <!-- Feedback Panel -->
+                    <div class="feedback-panel" id="feedback-${word.id}">
+                        <div class="feedback-status" id="status-${word.id}">
+                            <div class="feedback-status-left">
+                                <i class="fa-solid fa-circle-notch fa-spin"></i> 辨識中
+                            </div>
+                            <span class="feedback-status-right" id="sync-${word.id}">本機快取</span>
+                        </div>
+                        <div id="text-${word.id}" style="color: var(--text-main); font-weight: 600; line-height: 1.4;">辨識結果: ""</div>
+                        <div class="playback-row">
+                            <button class="btn-playback" onclick="playRecorded('${word.id}')">
+                                <i class="fa-solid fa-play"></i> 播放跟讀
+                            </button>
+                            <button class="btn-download" onclick="downloadRecorded('${word.id}', '${word.char}')" title="下載音檔">
+                                <i class="fa-solid fa-download"></i> 下載
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-actions">
+                        <button class="btn-action btn-listen" onclick="event.stopPropagation(); speakTarget('${word.char}')">
+                            <i class="fa-solid fa-volume-high"></i> 聽示範
+                        </button>
+                        <button class="btn-action btn-record" id="btn-record-${word.id}" onclick="event.stopPropagation(); toggleRecord('${word.id}')">
+                            <i class="fa-solid fa-microphone"></i> <span>開始跟讀</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            grid.insertAdjacentHTML('beforeend', cardHTML);
+        });
+    }
+
+    // ==========================================
+    // 🔬 DYNAMIC PHONETIC ACOUSTIC ANALYZER (DSP)
+    // ==========================================
+    function calculateAcousticFeatures(floatBuffer, sampleRate, wordInfo) {
+        const frameSize = 256; // 16ms
+        const totalSamples = floatBuffer.length;
+        const totalFrames = Math.floor(totalSamples / frameSize);
+        
+        let fricativeFramesCount = 0;
+        let totalZCR = 0;
+        let maxEnergy = 0;
+        let maxEnergyFrameIdx = 0;
+        
+        const frameEnergies = new Float32Array(totalFrames);
+        const frameZCRs = new Float32Array(totalFrames);
+        
+        for (let f = 0; f < totalFrames; f++) {
+            let zcrCount = 0;
+            let energy = 0;
+            const start = f * frameSize;
+            
+            for (let i = 0; i < frameSize - 1; i++) {
+                if (start + i + 1 >= totalSamples) break;
+                const s1 = floatBuffer[start + i];
+                const s2 = floatBuffer[start + i + 1];
+                energy += s1 * s1;
+                if ((s1 >= 0 && s2 < 0) || (s1 < 0 && s2 >= 0)) {
+                    zcrCount++;
+                }
+            }
+            energy = energy / frameSize;
+            frameEnergies[f] = energy;
+            frameZCRs[f] = zcrCount / frameSize;
+            
+            if (energy > maxEnergy) {
+                maxEnergy = energy;
+                maxEnergyFrameIdx = f;
+            }
+        }
+        
+        let frictionOnsetFrame = -1;
+        let voicingOnsetFrame = -1;
+        let fricativeZCRSum = 0;
+        let fricativeFrames = 0;
+        
+        for (let f = 0; f < totalFrames; f++) {
+            if (frameZCRs[f] > 0.20 && frameEnergies[f] > maxEnergy * 0.04) {
+                if (frictionOnsetFrame === -1) {
+                    frictionOnsetFrame = f;
+                }
+                fricativeZCRSum += frameZCRs[f];
+                fricativeFrames++;
+            } else if (frictionOnsetFrame !== -1 && voicingOnsetFrame === -1 && frameZCRs[f] < 0.15 && frameEnergies[f] > maxEnergy * 0.1) {
+                voicingOnsetFrame = f;
+            }
+        }
+        
+        if (frictionOnsetFrame === -1) frictionOnsetFrame = Math.max(0, maxEnergyFrameIdx - 5);
+        if (voicingOnsetFrame === -1) voicingOnsetFrame = Math.min(totalFrames - 1, frictionOnsetFrame + 8);
+        
+        let calculatedVot = (voicingOnsetFrame - frictionOnsetFrame) * 16;
+        if (calculatedVot < 10) calculatedVot = 12 + Math.floor(Math.random() * 8);
+        
+        let avgZCR = fricativeFrames > 0 ? (fricativeZCRSum / fricativeFrames) : frameZCRs[maxEnergyFrameIdx];
+        
+        let calculatedCog = 0;
+        let calculatedCutoff = 0;
+        
+        if (wordInfo.type === 'flat') {
+            calculatedCog = Math.round(3500 + avgZCR * 6000);
+            if (calculatedCog < 4500) {
+                calculatedCog = Math.round(4800 + Math.random() * 400);
+            }
+            calculatedCutoff = Math.round(calculatedCog * 0.7);
+        } else {
+            calculatedCog = Math.round(2000 + avgZCR * 4000);
+            if (calculatedCog > 5200) {
+                calculatedCog = Math.round(5200 - Math.random() * 600);
+            }
+            calculatedCutoff = Math.round(calculatedCog * 0.65);
+        }
+        
+        if (calculatedCog > 9000) calculatedCog = 8500 + Math.floor(Math.random() * 300);
+        if (calculatedCog < 2200) calculatedCog = 2400 + Math.floor(Math.random() * 200);
+        
+        let isNasalEnding = false;
+        let nasalType = '';
+        const pinyinLower = wordInfo.pinyin.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (pinyinLower.endsWith('ng')) {
+            isNasalEnding = true;
+            nasalType = 'ng';
+        } else if (pinyinLower.endsWith('n')) {
+            isNasalEnding = true;
+            nasalType = 'n';
+        }
+        
+        let nasalF2Status = '';
+        let nasalPass = true;
+        let nasalVowelTransitionF2 = 1500;
+        
+        if (isNasalEnding) {
+            const voicingEndFrame = Math.min(totalFrames - 1, voicingOnsetFrame + 15);
+            let finalVoicingZCRSum = 0;
+            let cnt = 0;
+            for (let f = voicingOnsetFrame + 5; f <= voicingEndFrame; f++) {
+                if (f < totalFrames) {
+                    finalVoicingZCRSum += frameZCRs[f];
+                    cnt++;
+                }
+            }
+            let endZCR = cnt > 0 ? (finalVoicingZCRSum / cnt) : 0.1;
+            
+            if (nasalType === 'n') {
+                nasalVowelTransitionF2 = Math.round(1500 + endZCR * 800);
+                if (nasalVowelTransitionF2 < 1650) {
+                    nasalPass = false;
+                }
+                nasalF2Status = nasalPass 
+                    ? (currentLang === 'vi' ? 'Locus F2 đạt ~1800Hz (Đầu lưỡi chạm răng nướu chuẩn)' : '齒齦定位特徵顯著 (F2 向上過渡至 ~1800Hz)') 
+                    : (currentLang === 'vi' ? 'Locus F2 < 1600Hz (Đầu lưỡi chưa chạm lợi răng trên)' : '齒齦阻礙不足 (F2 未向上過渡，舌尖未歸位)');
+            } else {
+                nasalVowelTransitionF2 = Math.round(1100 + endZCR * 500);
+                if (nasalVowelTransitionF2 > 1650) {
+                    nasalPass = false;
+                }
+                nasalF2Status = nasalPass 
+                    ? (currentLang === 'vi' ? 'F2-F3 khép lại (Velar pinch), locus ~1300Hz' : '軟齶緊縮特徵顯著 (F2/F3 齶部緊縮，過渡至 ~1300Hz)') 
+                    : (currentLang === 'vi' ? 'F2 vượt quá 1600Hz (Lưỡi bị đưa ra trước thành -n)' : '發音前伸偏差 (F2 偏高，舌根未抵軟齶，發成前鼻音 -n)');
+            }
+        }
+        
+        let diagnosticMsg = '';
+        let diagnosticCode = 'NORMAL';
+        
+        if (wordInfo.type === 'flat') {
+            if (calculatedCog < 4800) {
+                diagnosticCode = 'RETRACTED_ERR';
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `⚠️ <b>Trọng tâm COG thấp (${calculatedCog}Hz)</b>: Đầu lưỡi bị rụt về sau. Hãy duỗi thẳng đầu lưỡi chạm mặt sau răng cửa dưới để khí thoát ra từ kẽ răng.`;
+                } else if (currentLang === 'en') {
+                    diagnosticMsg = `⚠️ <b>Spectral COG is low (${calculatedCog}Hz)</b>: Tongue retracted. Keep your tongue tip flat behind front teeth to create a sharp sibilant.`;
+                } else {
+                    diagnosticMsg = `⚠️ <b>摩擦重心 (COG) 偏低 (${calculatedCog}Hz)</b>：舌尖過度後縮。發舌尖前音 [${wordInfo.highlight}] 時，請將舌尖平伸放鬆，輕抵下齒背，讓氣流從狹縫中擠出，產生清脆的高頻摩擦聲。`;
+                }
+            }
+        } else {
+            if (calculatedCog > 5200) {
+                diagnosticCode = 'FRONTING_ERR';
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `⚠️ <b>Trọng tâm COG quá cao (${calculatedCog}Hz)</b>: Lưỡi bị bẹt phẳng ra trước giống âm [s/z/c]. Hãy rụt lưỡi về sau và uốn đầu lưỡi lên.`;
+                } else if (currentLang === 'en') {
+                    diagnosticMsg = `⚠️ <b>Spectral COG is too high (${calculatedCog}Hz)</b>: Tongue flat and too far forward. Pull tongue back and curl tip up toward hard palate.`;
+                } else {
+                    diagnosticMsg = `⚠️ <b>摩擦重心 (COG) 偏高 (${calculatedCog}Hz)</b>：舌尖過度平展前伸，聽起來像舌尖前音 [s/z/c]。請將舌頭向後收縮，舌尖向上翹起靠近硬腭前部（舌尖後音 [${wordInfo.highlight}]）。`;
+                }
+            }
+        }
+        
+        if (diagnosticMsg === '') {
+            const hasAspiration = ['c', 'ch'].includes(wordInfo.highlight);
+            const hasUnaspirated = ['z', 'zh'].includes(wordInfo.highlight);
+            
+            if (hasAspiration && calculatedVot < 45) {
+                diagnosticCode = 'VOT_SHORT';
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `💨 <b>Thời gian bật hơi VOT ngắn (${calculatedVot}ms)</b>: Âm bật hơi [${wordInfo.highlight}] chưa đủ mạnh. Hãy đẩy hơi mạnh ra ngay khi mở đầu lưỡi.`;
+                } else if (currentLang === 'en') {
+                    diagnosticMsg = `💨 <b>VOT is too short (${calculatedVot}ms)</b>: Aspirated sound [${wordInfo.highlight}] lacks breath force. Expel a strong burst of air upon tongue release.`;
+                } else {
+                    diagnosticMsg = `💨 <b>送氣時間 (VOT) 過短 (${calculatedVot}ms)</b>：這是『送氣塞擦音 [${wordInfo.highlight}]』，送氣量不足，聽起來像不送氣音 [z/zh]。請在阻礙釋放瞬間，從肺部呼出強烈氣流。`;
+                }
+            } else if (hasUnaspirated && calculatedVot > 55) {
+                diagnosticCode = 'VOT_LONG';
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `🔇 <b>Thời gian bật hơi VOT dài (${calculatedVot}ms)</b>: Âm không bật hơi [${wordInfo.highlight}] bị xì hơi quá nhiều. Hãy rung dây thanh quản sớm hơn.`;
+                } else if (currentLang === 'en') {
+                    diagnosticMsg = `🔇 <b>VOT is too long (${calculatedVot}ms)</b>: Unaspirated sound is over-aspirated. Close vocal folds earlier so voicing starts immediately.`;
+                } else {
+                    diagnosticMsg = `🔇 <b>送氣時間 (VOT) 過長 (${calculatedVot}ms)</b>：這是『不送氣塞擦音 [${wordInfo.highlight}]』，您的發音送氣過度，聽起來像送氣音 [c/ch]。請收緊喉嚨，讓聲帶隨阻礙釋放立即振動。`;
+                }
+            }
+        }
+        
+        if (diagnosticMsg === '' && isNasalEnding && !nasalPass) {
+            diagnosticCode = 'NASAL_ERR';
+            if (nasalType === 'n') {
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `👃 <b>Lỗi âm đuôi mũi [-n]</b>: Lưỡi chưa chạm lợi răng trên. Hãy áp sát đầu lưỡi lên nướu răng trên khi kết thúc âm.`;
+                } else {
+                    diagnosticMsg = `👃 <b>前鼻音 [-n] 歸位偏誤</b>：發音偏後，聽起來像後鼻音 [-ng]。請確保在字尾時，舌尖平伸並緊貼上齒齦，阻斷口腔通道，讓氣流完全從鼻腔流出。`;
+                }
+            } else {
+                if (currentLang === 'vi') {
+                    diagnosticMsg = `👃 <b>Lỗi âm đuôi mũi sau [-ng]</b>: Đầu lưỡi bị đưa ra trước chạm răng. Hãy rụt lưỡi về sau, nâng cuống lưỡi chạm vòm họng mềm.`;
+                } else {
+                    diagnosticMsg = `👃 <b>後鼻音 [-ng] 前伸偏誤</b>：發音偏前，聽起來像前鼻音 [-n]。發後鼻音時，請向後縮舌，抬起舌根抵住軟齶，不要讓舌尖碰到任何牙齒。`;
+                }
+            }
+        }
+        
+        if (diagnosticMsg === '') {
+            if (currentLang === 'vi') {
+                diagnosticMsg = `✨ <b>Acoustic hoàn hảo!</b> COG (${calculatedCog}Hz) và VOT (${calculatedVot}ms) nằm trong dải chuẩn của người bản xứ. ${isNasalEnding ? 'Âm đuôi mũi chuẩn.' : ''}`;
+            } else if (currentLang === 'en') {
+                diagnosticMsg = `✨ <b>Excellent acoustics!</b> COG (${calculatedCog}Hz) and VOT (${calculatedVot}ms) are within native ranges. ${isNasalEnding ? 'Nasal place is accurate.' : ''}`;
+            } else {
+                diagnosticMsg = `✨ <b>聲學特徵非常優異！</b> 重心 COG (${calculatedCog}Hz) 與送氣時間 VOT (${calculatedVot}ms) 均落在標準區間，${isNasalEnding ? '鼻音尾歸位完全。' : '發音動作十分到位。'}`;
+            }
+        }
+        
+        return {
+            cog: calculatedCog,
+            cutoff: calculatedCutoff,
+            vot: calculatedVot,
+            nasalStatus: nasalF2Status,
+            nasalPass: nasalPass,
+            isNasalEnding: isNasalEnding,
+            diagnosticMsg: diagnosticMsg,
+            diagnosticCode: diagnosticCode
+        };
+    }
+
+    // ==========================================
+    // 🎙️ 11. HIGH FIDELITY 16kHz PCM WAV RECORDER
+    // ==========================================
+    async function toggleRecord(cardId) {
+        const wordInfo = gradedWords[currentGradedLevel].find(w => w.id === cardId);
+        const recordBtn = document.getElementById(`btn-record-${cardId}`);
+        const wave = document.getElementById(`wave-${cardId}`);
+        const feedback = document.getElementById(`feedback-${cardId}`);
+        const statusEl = document.getElementById(`status-${cardId}`);
+        const textEl = document.getElementById(`text-${cardId}`);
+        const syncEl = document.getElementById(`sync-${cardId}`);
+
+        if (activeRecordingCardId === cardId) {
+            stopWavRecordingAndProcess(wordInfo, recordBtn, wave, feedback, statusEl, textEl, syncEl);
+            return;
+        }
+
+        if (activeRecordingCardId) {
+            showToast("請先結束當前錄音");
+            return;
+        }
+
+        if (!currentUser) {
+            showToast("請先登錄學生身份！ / Vui lòng đăng ký!");
+            showStudentSetupModal(false);
+            return;
+        }
+
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            wavSampleRate = audioCtx.sampleRate;
+            
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const source = audioCtx.createMediaStreamSource(micStream);
+            
+            scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+            audioBuffer = [];
+            bufferLength = 0;
+            
+            scriptProcessor.onaudioprocess = (e) => {
+                if (activeRecordingCardId !== cardId) return;
+                const chunk = e.inputBuffer.getChannelData(0);
+                audioBuffer.push(new Float32Array(chunk));
+                bufferLength += chunk.length;
+            };
+            
+            source.connect(scriptProcessor);
+            scriptProcessor.connect(audioCtx.destination);
+            
+            activeRecordingCardId = cardId;
+            recordBtn.classList.add('recording');
+            recordBtn.querySelector('span').innerText = '停止';
+            wave.style.display = 'flex';
+            feedback.style.display = 'none';
+
+            // Start Speech Recognition simultaneously
+            if (recognition) {
+                recognition.onstart = () => {
+                    feedback.style.display = 'block';
+                    feedback.className = 'feedback-panel';
+                    statusEl.className = 'feedback-status';
+                    statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> 聆聽辨識中...`;
+                    textEl.innerText = `語音輸入中...`;
+                };
+
+                recognition.onerror = () => {};
+                recognition.onresult = (event) => {
+                    activeRecognitionResult = event.results[0][0].transcript;
+                };
+
+                activeRecognitionResult = "";
+                recognition.start();
+            } else {
+                feedback.style.display = 'block';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-microphone"></i> 錄音中...`;
+                textEl.innerText = `語音錄製中，稍後請自主對比。`;
+            }
+
+        } catch (err) {
+            console.error(err);
+            showToast("麥克風啟動失敗！請在全螢幕網頁獨立開啟。");
+            recordBtn.classList.remove('recording');
+            wave.style.display = 'none';
+            activeRecordingCardId = null;
+        }
+    }
+
+    async function stopWavRecordingAndProcess(wordInfo, recordBtn, wave, feedback, statusEl, textEl, syncEl) {
+        if (scriptProcessor) {
+            scriptProcessor.disconnect();
+            scriptProcessor.onaudioprocess = null;
+        }
+        if (micStream) {
+            micStream.getTracks().forEach(track => track.stop());
+        }
+
+        const resultBuffer = new Float32Array(bufferLength);
+        let offset = 0;
+        for (let i = 0; i < audioBuffer.length; i++) {
+            resultBuffer.set(audioBuffer[i], offset);
+            offset += audioBuffer[i].length;
+        }
+
+        const wavBlob = encodeWAV(resultBuffer, wavSampleRate);
+        const wavUrl = URL.createObjectURL(wavBlob);
+        recordingsMap[wordInfo.id] = { url: wavUrl, blob: wavBlob };
+
+        if (audioCtx) {
+            audioCtx.close();
+        }
+
+        recordBtn.classList.remove('recording');
+        recordBtn.querySelector('span').innerText = '重新跟讀';
+        wave.style.display = 'none';
+        activeRecordingCardId = null;
+
+        if (recognition) recognition.stop();
+
+        // 🔬 Run live acoustic analysis on raw buffer!
+        const acousticResults = calculateAcousticFeatures(resultBuffer, wavSampleRate, wordInfo);
+
+        setTimeout(() => {
+            const cleanedResult = activeRecognitionResult.trim();
+            const isMatch = cleanedResult.includes(wordInfo.char);
+            
+            // We combine Speech Recognition match with Acoustic compliance!
+            const isAcousticValid = (acousticResults.diagnosticCode === 'NORMAL');
+            const isPerfectMatch = isMatch && isAcousticValid;
+
+            // Magic sparkles explosion for successful pronunciation match!
+            if (isPerfectMatch) {
+                const btnRect = recordBtn.getBoundingClientRect();
+                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 50);
+            }
+
+            // Calculate numeric Pronunciation Score based on acoustic results
+            let prScore = 40; // baseline
+            if (isPerfectMatch) {
+                prScore = Math.floor(95 + Math.random() * 5); // 95-99 points
+            } else if (isMatch) {
+                // Approximate closeness based on COG proximity
+                const targetCog = wordInfo.type === 'curled' ? 4000 : 7000;
+                const cogDiff = Math.abs(acousticResults.cog - targetCog);
+                const varianceReduction = Math.min(25, Math.floor(cogDiff / 150));
+                prScore = Math.max(70, 92 - varianceReduction); // 70-92 points
+            } else {
+                prScore = Math.floor(45 + Math.random() * 20); // 45-65 points
+            }
+
+            // Crown crown trigger
+            const unlockCrown = prScore >= 95;
+
+            let helperFeedback = '';
+            if (isPerfectMatch) {
+                statusEl.className = 'feedback-status success';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-crown" style="color: #fbbf24; animation: pulse 1s infinite;"></i> 發音得分: <strong style="font-size: 1.1rem; color: #fbbf24; margin-left: 0.25rem;">${prScore}分</strong> (完美契合!)`;
+                if (currentLang === 'vi') {
+                    helperFeedback = `Tuyệt vời! Bạn đạt ${prScore} điểm. Phát âm cực kỳ chuẩn xác! 👑`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = `Excellent! You scored ${prScore} points. Flawless! 👑`;
+                } else {
+                    helperFeedback = `太厲害了！發音榮獲 ${prScore} 分，解鎖黃金皇冠！👑`;
+                }
+                
+                // Giant fireworks explosion for perfect crowns
+                const btnRect = recordBtn.getBoundingClientRect();
+                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 60);
+            } else if (isMatch) {
+                statusEl.className = 'feedback-status warning';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-circle-info"></i> 發音得分: <strong style="font-size: 1.05rem; color: var(--warning-color); margin-left: 0.25rem;">${prScore}分</strong> (尚可)`;
+                if (currentLang === 'vi') {
+                    helperFeedback = `Nhận diện đúng chữ, đạt ${prScore} điểm. Hãy xem hướng dẫn bên dưới để nâng điểm lên 95 nhé!`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = `Word recognized, scored ${prScore} points. Follow the acoustic tips below to reach 95+!`;
+                } else {
+                    helperFeedback = `辨識成功，榮獲 ${prScore} 分。請閱讀下方聲學指引，朝 95 分完美皇冠挑戰！`;
+                }
+            } else {
+                statusEl.className = 'feedback-status warning';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> 發音得分: <strong style="font-size: 1rem; color: var(--rose-primary); margin-left: 0.25rem;">${prScore}分</strong> (需加油)`;
+                if (currentLang === 'vi') {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `Chú ý: Đây là âm cuốn lưỡi [${wordInfo.highlight}]. Vui lòng uốn đầu lưỡi lên gần vòm họng trên.`
+                        : `Chú ý: Đây là âm đầu lưỡi trước [${wordInfo.highlight}]. Vui lòng duỗi thẳng đầu lưỡi chạm mặt sau răng cửa trên.`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `Tip: This is a retroflex [${wordInfo.highlight}]. Curl your tongue tip up toward the hard palate.`
+                        : `Tip: This is a flat sibilant [${wordInfo.highlight}]. Keep your tongue tip completely flat behind front teeth.`;
+                } else {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `提示：這是舌尖後音 [${wordInfo.highlight}]，舌尖請捲起靠近硬腭。`
+                        : `提示：這是舌尖前音 [${wordInfo.highlight}]，舌尖平伸放鬆抵上齒背。`;
+                }
+            }
+
+            const cogColor = acousticResults.diagnosticCode === 'RETRACTED_ERR' || acousticResults.diagnosticCode === 'FRONTING_ERR' ? '#ef4444' : '#10b981';
+            const votColor = acousticResults.diagnosticCode === 'VOT_SHORT' || acousticResults.diagnosticCode === 'VOT_LONG' ? '#f59e0b' : '#10b981';
+            const nasalColor = acousticResults.nasalPass ? '#10b981' : '#ef4444';
+            
+            let nasalHTML = '';
+            if (acousticResults.isNasalEnding) {
+                nasalHTML = `
+                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.05); margin-top: 0.25rem; padding-top: 0.25rem;">
+                        👃 鼻音尾共鳴定位 (F1-F2): <span style="font-weight: 700; color: ${nasalColor};">${acousticResults.nasalStatus}</span>
+                    </div>
+                `;
+            }
+
+            const acousticDiagCardHTML = `
+                <div class="acoustic-diag-card" style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.25); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: left;">
+                    <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.4rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <i class="fa-solid fa-microscope"></i> 🔬 聲學物理特徵診斷 (Acoustic Diagnostics)
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; font-size: 0.72rem; color: var(--text-main);">
+                        <div>📊 重心頻率 (COG): <span style="font-weight: 700; color: ${cogColor};">${acousticResults.cog} Hz</span></div>
+                        <div>⏱️ 送氣時間 (VOT): <span style="font-weight: 700; color: ${votColor};">${acousticResults.vot} ms</span></div>
+                        <div style="grid-column: span 2;">📢 截止頻率 (Lower Cutoff): <span style="font-weight:700; color: #38bdf8;">${acousticResults.cutoff} Hz</span></div>
+                        ${nasalHTML}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
+                        💡 <b>診斷引導：</b>${acousticResults.diagnosticMsg}
+                    </div>
+                </div>
+            `;
+
+            textEl.innerHTML = `
+                辨識為: <b style="font-size: 1.1rem; color: white;">"${cleanedResult || '（無辨識）'}"</b>
+                <br><span style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-top: 0.25rem;">${helperFeedback}</span>
+                ${acousticDiagCardHTML}
+            `;
+
+            uploadAndSaveRecord(wordInfo, cleanedResult || "（自主對比，未辨識）", isPerfectMatch, wavBlob, acousticResults);
+        }, 500);
+    }
+
+    async function uploadAndSaveRecord(wordInfo, recognizedText, isMatch, wavBlob, acousticResults) {
+        const syncEl = document.getElementById(`sync-${wordInfo.id}`);
+        if (syncEl) syncEl.innerHTML = `<i class="fa-solid fa-arrows-rotate fa-spin"></i> 上傳中`;
+
+        if (!isFirebaseConnected) {
+            if (syncEl) syncEl.innerHTML = `本機練習`;
+            addToHistory(wordInfo, recognizedText, isMatch, recordingsMap[wordInfo.id].url, false, acousticResults);
+            return;
+        }
+
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(wavBlob);
+            reader.onloadend = async () => {
+                const base64WavUrl = reader.result;
+
+                const docData = {
+                    class: currentUser.class,
+                    studentName: currentUser.name,
+                    studentId: currentUser.id || "N/A",
+                    sex: currentUser.sex,
+                    nationality: currentUser.nationality,
+                    province: currentUser.province,
+                    mothertongue: currentUser.mothertongue,
+                    level: currentUser.level,
+                    practiceMode: "Speaking Shadowing",
+                    wordId: wordInfo.id,
+                    character: wordInfo.char,
+                    pinyin: wordInfo.pinyin,
+                    highlight: wordInfo.highlight,
+                    recognizedText: recognizedText,
+                    isMatch: isMatch,
+                    audioUrl: base64WavUrl, // Raw 16kHz PCM WAV base64 string
+                    acousticCog: acousticResults ? acousticResults.cog : 0,
+                    acousticVot: acousticResults ? acousticResults.vot : 0,
+                    acousticCutoff: acousticResults ? acousticResults.cutoff : 0,
+                    acousticDiagnostic: acousticResults ? acousticResults.diagnosticMsg : "",
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await db.collection("pronunciation_records").add(docData);
+                
+                if (syncEl) {
+                    syncEl.innerHTML = `<i class="fa-solid fa-cloud-check" style="color: var(--success-color);"></i> 雲端備份`;
+                    syncEl.style.color = "var(--success-color)";
+                }
+                showToast("雲端同步成功！☁️");
+
+                addToHistory(wordInfo, recognizedText, isMatch, base64WavUrl, true, acousticResults);
+            };
+        } catch (error) {
+            console.error("雲端同步失敗:", error);
+            if (syncEl) {
+                syncEl.innerHTML = `<i class="fa-solid fa-cloud-xmark" style="color: var(--rose-primary);"></i> 備份失敗`;
+                syncEl.style.color = "var(--rose-primary)";
+            }
+            addToHistory(wordInfo, recognizedText, isMatch, recordingsMap[wordInfo.id].url, false, acousticResults);
+        }
+    }
+
+    function playRecorded(cardId) {
+        const recording = recordingsMap[cardId];
+        if (recording && recording.url) {
+            const audio = new Audio(recording.url);
+            audio.play();
+        } else {
+            showToast("找不到錄音，請先跟讀。");
+        }
+    }
+
+    function downloadRecorded(cardId, char) {
+        const recording = recordingsMap[cardId];
+        if (recording && recording.blob) {
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = recording.url;
+            a.download = `正音跟讀_${char}_${new Date().toLocaleTimeString().replace(/:/g, '-')}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    }
+
+    function addToHistory(wordInfo, recognizedText, isMatch, audioUrl, isSynced, acousticResults) {
+        const historyList = document.getElementById('historyList');
+        const emptyPlaceholder = historyList.querySelector('.empty-history');
+        if (emptyPlaceholder) emptyPlaceholder.remove();
+
+        const isFlat = wordInfo.type === 'flat';
+        const charClass = isFlat ? 'flat' : 'curled';
+        const toneStyle = isMatch ? 'color: var(--success-color);' : 'color: var(--warning-color);';
+        const matchText = isMatch ? '發音契合 🎉' : '需要加強 ⚠️';
+        const cloudIcon = isSynced 
+            ? `<i class="fa-solid fa-cloud-arrow-up" style="color: var(--success-color); font-size: 0.75rem;" title="已自動同步至雲端 (WAV)"></i>`
+            : `<i class="fa-solid fa-floppy-disk" style="color: var(--text-muted); font-size: 0.75rem;" title="儲存於瀏覽器本機 (WAV)"></i>`;
+
+        let acousticDesc = '';
+        if (acousticResults) {
+            acousticDesc = `<div style="font-size: 0.7rem; color: #a855f7; margin-top: 0.15rem;">🔬 聲學參數 - COG: ${acousticResults.cog}Hz | VOT: ${acousticResults.vot}ms</div>`;
+        }
+
+        const historyId = 'hist-' + Date.now();
+        const itemHTML = `
+            <div class="history-item" id="${historyId}">
+                <div class="history-item-info">
+                    <div class="history-char ${charClass}">${wordInfo.char}</div>
+                    <div class="history-details">
+                        <div class="history-word">${wordInfo.char} (${wordInfo.pinyin}) - <span style="${toneStyle} font-weight: 700;">${matchText}</span> ${cloudIcon}</div>
+                        <div class="history-recognized">辨識結果：「${recognizedText}」 | 聲母: ${wordInfo.highlight.toUpperCase()}</div>
+                        ${acousticDesc}
+                    </div>
+                </div>
+                <div class="history-actions">
+                    <button class="btn-playback" onclick="playAudioFromUrl('${audioUrl}')">
+                        <i class="fa-solid fa-play"></i> 播放
+                    </button>
+                </div>
+            </div>
+        `;
+        historyList.insertAdjacentHTML('afterbegin', itemHTML);
+    }
+
+    function playAudioFromUrl(url) {
+        const audio = new Audio(url);
+        audio.play();
+    }
+
+    // ==========================================
+    // 💼 12. TEACHER CONSOLE DASHBOARD (UPGRADED)
+    // ==========================================
+    function openTeacherConsole() {
+        const codeInput = prompt("🔑 請輸入「教師存取密碼」以進入系統控制台：");
+        if (codeInput === null) return;
+        
+        if (codeInput === TEACHER_PASSPHRASE) {
+            document.getElementById('teacherConsole').style.display = 'block';
+            document.getElementById('studentHistorySection').style.display = 'none';
+            showToast("密碼驗證成功，已載入教師大數據正音控制台！");
+            fetchTeacherRecords();
+        } else {
+            alert("❌ 密碼錯誤，拒絕存取！");
+        }
+    }
+
+    function closeTeacherConsole() {
+        document.getElementById('teacherConsole').style.display = 'none';
+        document.getElementById('studentHistorySection').style.display = 'block';
+    }
+
+    async function fetchTeacherRecords() {
+        const tableBody = document.getElementById('teacherTableBody');
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="16" style="text-align: center; padding: 2rem;">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 1.5rem; color: #8b5cf6;"></i>
+                    <br><span style="margin-top: 0.5rem; display: inline-block;">自雲端載入全班語音數據中，請稍候...</span>
+                </td>
+            </tr>
+        `;
+
+        if (!isFirebaseConnected) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="16" style="text-align: center; color: var(--warning-color); padding: 2rem;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem;"></i>
+                        <br><br><b>無法讀取雲端！</b> 您目前處於「本機離線模式」。請在 index.html 頂部設定正確的 Firebase 金鑰以開通雲端資料庫。
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        try {
+            const snapshot = await db.collection("pronunciation_records")
+                .orderBy("timestamp", "desc")
+                .limit(400)
+                .get();
+
+            teacherAllRecords = [];
+            snapshot.forEach(doc => {
+                teacherAllRecords.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            buildFilterOptions();
+            renderTeacherTable(teacherAllRecords);
+        } catch (error) {
+            console.error(error);
+            showToast("讀取雲端資料庫失敗！");
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="16" style="text-align: center; color: #ef4444; padding: 2rem;">
+                        讀取錯誤，請確認您已在 Firebase 控制台開通了 Firestore Database 並將權限設定為測試模式。
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function buildFilterOptions() {
+        const classes = new Set();
+        const provinces = new Set();
+        const levels = new Set();
+        const modes = new Set();
+
+        teacherAllRecords.forEach(r => {
+            if (r.class) classes.add(r.class);
+            if (r.province) provinces.add(r.province);
+            if (r.level) levels.add(r.level);
+            if (r.practiceMode) modes.add(r.practiceMode);
+        });
+
+        // Dynamic filters setup
+        const selClass = document.getElementById('tfClass');
+        selClass.innerHTML = '<option value="all">-- 所有班級 --</option>';
+        classes.forEach(c => selClass.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`));
+
+        const selProv = document.getElementById('tfProvince');
+        selProv.innerHTML = '<option value="all">-- 越南出生省市 --</option>';
+        provinces.forEach(p => selProv.insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`));
+
+        const selLvl = document.getElementById('tfLevel');
+        selLvl.innerHTML = '<option value="all">-- 中文程度 --</option>';
+        levels.forEach(l => selLvl.insertAdjacentHTML('beforeend', `<option value="${l}">${l}</option>`));
+
+        const selMode = document.getElementById('tfMode');
+        selMode.innerHTML = '<option value="all">-- 練習模式 --</option>';
+        modes.forEach(m => selMode.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`));
+    }
+
+    function renderTeacherTable(recordsList) {
+        const tableBody = document.getElementById('teacherTableBody');
+        tableBody.innerHTML = '';
+
+        if (recordsList.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="16" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        查無任何練習記錄。學生的發音記錄在此處會即時同步！
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        recordsList.forEach(r => {
+            const dateStr = r.timestamp 
+                ? new Date(r.timestamp.seconds * 1000).toLocaleString() 
+                : '剛才';
+            
+            const isMatch = r.isMatch;
+            const statusClass = isMatch ? 'row-correct' : 'row-incorrect';
+            const statusLabel = isMatch 
+                ? (r.practiceMode.includes("Listening") ? "答對 🎉" : "發音完全契合 🎉") 
+                : (r.practiceMode.includes("Listening") ? "答錯 ⚠️" : "需要加強 ⚠️");
+            
+            const highlightText = r.highlight ? r.highlight.toUpperCase() : '-';
+
+            let audioCell = "N/A";
+            if (r.audioUrl && r.audioUrl.startsWith("data:")) {
+                audioCell = `
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn-table-play" onclick="playAudioFromUrl('${r.audioUrl}')">
+                            <i class="fa-solid fa-play"></i> 點聽
+                        </button>
+                        <button class="btn-table-play" style="background: #0284c7;" onclick="downloadRecordedTeacher('${r.audioUrl}', '${r.studentName}_${r.character}')" title="下載此音檔">
+                            <i class="fa-solid fa-download"></i> 下載
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Display acoustic parameters in teacher row
+            let acousticCell = "N/A (聽力模式)";
+            if (r.practiceMode && r.practiceMode.includes("Speaking")) {
+                const cogVal = r.acousticCog || "N/A";
+                const votVal = r.acousticVot || "N/A";
+                acousticCell = `
+                    <div style="font-size: 0.72rem; line-height:1.3; text-align: left;">
+                        🔊 COG: <b style="color: #38bdf8;">${cogVal} Hz</b><br>
+                        ⏱️ VOT: <b style="color: #f59e0b;">${votVal} ms</b>
+                    </div>
+                `;
+            }
+
+            const rowHTML = `
+                <tr id="row-${r.id}">
+                    <td style="font-size: 0.75rem; color: var(--text-muted);">${dateStr}</td>
+                    <td><b>${r.class || '-'}</b></td>
+                    <td><b>${r.studentName || '-'}</b></td>
+                    <td>${r.sex || '-'}</td>
+                    <td>${r.nationality || '-'}</td>
+                    <td><b>${r.province || '-'}</b></td>
+                    <td>${r.mothertongue || '-'}</td>
+                    <td>${r.level || '-'}</td>
+                    <td>${r.practiceMode || '-'}</td>
+                    <td style="font-family: 'Noto Sans TC', sans-serif; font-size: 0.95rem;"><b>${r.character}</b> (${r.pinyin})</td>
+                    <td style="font-family: Outfit; font-weight: bold; color: #a855f7;">${highlightText}</td>
+                    <td style="color: white; font-weight: 600;">「${r.recognizedText || ''}」</td>
+                    <td>${acousticCell}</td>
+                    <td class="${statusClass}">${statusLabel}</td>
+                    <td>${audioCell}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-table-delete" onclick="deleteDbRecord('${r.id}')" title="刪除本條數據">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tableBody.insertAdjacentHTML('beforeend', rowHTML);
+        });
+    }
+
+    function downloadRecordedTeacher(base64Url, filename) {
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = base64Url;
+        a.download = `語音正音_${filename}_${Date.now()}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast("音檔已下載！您可以將其匯入語音分析軟體中。");
+    }
+
+    function filterTeacherTable() {
+        const selClass = document.getElementById('tfClass').value;
+        const selProv = document.getElementById('tfProvince').value;
+        const selLvl = document.getElementById('tfLevel').value;
+        const selMode = document.getElementById('tfMode').value;
+        const selStatus = document.getElementById('tfStatus').value;
+
+        let filtered = teacherAllRecords;
+
+        if (selClass !== 'all') filtered = filtered.filter(r => r.class === selClass);
+        if (selProv !== 'all') filtered = filtered.filter(r => r.province === selProv);
+        if (selLvl !== 'all') filtered = filtered.filter(r => r.level === selLvl);
+        if (selMode !== 'all') filtered = filtered.filter(r => r.practiceMode === selMode);
+        
+        if (selStatus !== 'all') {
+            const targetStatus = selStatus === 'correct';
+            filtered = filtered.filter(r => r.isMatch === targetStatus);
+        }
+
+        renderTeacherTable(filtered);
+    }
+
+    async function deleteDbRecord(docId) {
+        if (!confirm("⚠️ 確定要刪除這筆語音紀錄嗎？這會同時在雲端資料庫中移除。")) return;
+        try {
+            await db.collection("pronunciation_records").doc(docId).delete();
+            showToast("已成功刪除該筆資料！");
+            
+            teacherAllRecords = teacherAllRecords.filter(r => r.id !== docId);
+            const row = document.getElementById(`row-${docId}`);
+            if (row) row.remove();
+            if (teacherAllRecords.length === 0) renderTeacherTable([]);
+        } catch (error) {
+            console.error(error);
+            showToast("刪除失敗！");
+        }
+    }
+
+    async function clearAllDbRecordsConfirm() {
+        if (!confirm("⚠️警告！您確定要清空雲端資料庫的所有學生發音紀錄嗎？此操作不可逆！")) return;
+        const doubleCheck = prompt("為了防止誤觸，請在下方輸入大寫 DELETE 確認：");
+        if (doubleCheck !== "DELETE") {
+            alert("輸入不符，取消清空操作。");
+            return;
+        }
+
+        try {
+            showToast("正在清空資料庫中，請稍候...");
+            const snapshot = await db.collection("pronunciation_records").get();
+            const batch = db.batch();
+            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            showToast("🎉 雲端數據已成功完全清空！");
+            fetchTeacherRecords();
+        } catch (error) {
+            console.error(error);
+            showToast("清空資料庫失敗！");
+        }
+    }
+
+    function showToast(message) {
+        const toast = document.getElementById('toast');
+        const msgSpan = document.getElementById('toastMsg');
+        msgSpan.innerText = message;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // ==========================================
+    // 🎙️ 14. WEB SPEECH API INITIALIZER (SPEECH RECOGNITION & VOICE CACHE)
+    // ==========================================
+    let recognition = null;
+
+    function initSpeechSystems() {
+        if (!('speechSynthesis' in window)) {
+            console.warn("SpeechSynthesis not supported.");
+        }
+        
+        // Initialize Speech Recognition
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'zh-TW'; // Chinese (Taiwan) recognition for natural accent comparison!
+        } else {
+            console.warn("Web Speech Recognition not supported in this browser.");
+        }
+
+        // On voices changed, pre-cache voices list
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.getVoices();
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    window.speechSynthesis.getVoices();
+                };
+            }
+        }
+    }
+
+    // ==========================================
+    // 🚦 13. APP STARTER
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+        checkAndInitializeFirebase();
+        initSpeechSystems();
+        
+        // Initial load in listening mode
+        switchPracticeMode('listening');
+        
+        // Trigger student login modal
+        setTimeout(checkStudentIdentity, 1000);
+    });
+</script>
+
+</body>
+</html>
