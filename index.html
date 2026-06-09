@@ -4623,11 +4623,6 @@
             const randomPraise = praises[Math.floor(Math.random() * praises.length)];
             showToast(randomPraise);
 
-            // Auto-advance after 1.5 seconds so students don't need to click next manually
-            if (quizTimeout) clearTimeout(quizTimeout);
-            quizTimeout = setTimeout(() => {
-                nextQuizStep(isFinished);
-            }, 1500);
         } else {
             btnEl.classList.add('wrong');
             
@@ -4647,6 +4642,13 @@
                 if (btn !== btnEl) btn.classList.add('correct');
             });
         }
+
+        // Auto-advance in both cases!
+        if (quizTimeout) clearTimeout(quizTimeout);
+        const autoAdvanceDelay = isCorrect ? 1500 : 2500;
+        quizTimeout = setTimeout(() => {
+            nextQuizStep(isFinished);
+        }, autoAdvanceDelay);
 
         // Show pinyin anyway for learning
         document.querySelectorAll('.btn-quiz-option .opt-pinyin').forEach(p => p.style.visibility = 'visible');
@@ -5483,6 +5485,11 @@
         }
 
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast("Hệ thống Micro bị chặn! Hãy sử dụng giao thức HTTPS hoặc localhost để cấp quyền ghi âm. / Insecure context: Please use HTTPS or localhost.");
+                return;
+            }
+
             audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
             wavSampleRate = audioCtx.sampleRate;
             
