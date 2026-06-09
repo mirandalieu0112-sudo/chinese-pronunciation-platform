@@ -5459,6 +5459,14 @@
     // ==========================================
     // 🎙️ 11. HIGH FIDELITY 16kHz PCM WAV RECORDER
     // ==========================================
+    let activeRecordingCardId = null;
+    let audioCtx = null;
+    let micStream = null;
+    let scriptProcessor = null;
+    let audioBuffer = [];
+    let bufferLength = 0;
+    let wavSampleRate = 16000;
+
     async function toggleRecord(cardId) {
         const wordInfo = findWordById(cardId);
         const recordBtn = document.getElementById(`btn-record-${cardId}`);
