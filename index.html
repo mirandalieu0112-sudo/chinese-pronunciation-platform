@@ -3026,7 +3026,7 @@
             <!-- 1. Name Input -->
             <div class="form-group" style="margin-bottom: 1rem;">
                 <label class="form-label" id="label-name" style="font-size: 0.85rem; font-weight: 700; color: white;">1. 姓名 / Họ và tên THẬT (Bắt buộc - HOA KHÔNG DẤU):</label>
-                <input class="form-input" type="text" id="stName" placeholder="Ví dụ: NGUYEN VAN AN" oninput="handleNaming(this)" required style="text-transform: uppercase; background: rgba(0,0,0,0.3); border: 1px solid var(--surface-border); border-radius: 12px; color: white; padding: 0.6rem; width: 100%; box-sizing: border-box; font-family: inherit;">
+                <input class="form-input" type="text" id="stName" placeholder="Ví dụ: NGUYEN VAN AN" oninput="handleNaming(this)" oncompositionstart="window.isComposingName = true" oncompositionend="window.isComposingName = false; handleNaming(this)" required style="text-transform: uppercase; background: rgba(0,0,0,0.3); border: 1px solid var(--surface-border); border-radius: 12px; color: white; padding: 0.6rem; width: 100%; box-sizing: border-box; font-family: inherit;">
                 <div class="form-help-text" id="help-name" style="font-size: 0.68rem; color: var(--text-muted); margin-top: 0.2rem;">* 請輸入與證件相同的越文姓名（系統會自動去聲調）。/ Vui lòng điền họ tên như trên giấy tờ (Hệ thống sẽ tự động bỏ dấu).</div>
             </div>
 
@@ -3930,8 +3930,10 @@
     let db = null;
     let forumPosts = [];
     let isTeacherLoggedIn = false;
+    window.isComposingName = false; // Expose to window so inline HTML attributes can read it
 
     function handleNaming(input) {
+        if (window.isComposingName) return;
         let str = input.value;
         
         // Normalize accents (remove diacritics for Vietnamese Latin input)
