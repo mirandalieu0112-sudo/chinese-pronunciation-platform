@@ -3792,6 +3792,7 @@
     let currentPracticeMode = 'listening'; // 'listening' or 'speaking'
     let currentGradedLevel = 'group1';     // group1, group2, group3, group4, group5
     let currentFilterPair = 'all';        // all, z-zh, c-ch, s-sh
+    let currentSpeakingIndex = 0;
 
     // 🗺️ Level Lock & Gamified Path Global State
     let unlockedListeningLevel = parseInt(localStorage.getItem('unlockedListeningLevel') || '1');
@@ -4263,6 +4264,7 @@
 
     function switchGradedLevel(level) {
         currentGradedLevel = level;
+        currentSpeakingIndex = 0; // Reset index when switching level
 
         // Hide/Show sub-filters dynamically
         const subFilters = document.getElementById('subFilters');
@@ -4292,6 +4294,7 @@
         }
 
         currentFilterPair = pairType;
+        currentSpeakingIndex = 0; // Reset index when switching filter
         document.querySelectorAll('#subFilters .btn-filter').forEach(btn => btn.classList.remove('active'));
         if (window.event) {
             window.event.currentTarget.classList.add('active');
@@ -4806,97 +4809,204 @@
     // ==========================================
     // 🗣️ 10. 口說跟讀練習 & SVG 舌位指引
     // ==========================================
-    function findWordById(cardId) {
-        const gr = gradedWords[currentGradedLevel];
-        if (!gr) return null;
-        for (const key in gr) {
-            if (Array.isArray(gr[key])) {
-                const found = gr[key].find(w => w.id === cardId);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    window.selectPracticeWord = function(wordId) {
-        const word = findWordById(wordId);
-        if (word) {
-            updateArticulationPanelUI(word);
-            
-            // Visual active border styling
-            document.querySelectorAll('.practice-card').forEach(card => {
-                card.style.borderColor = 'var(--surface-border)';
+    function getSpeakingCompletedCount(wordsList) {
+        const saved = localStorage.getItem('pinyin_vn_speaking_records');
+        if (!saved) return 0;
+        try {
+            const records = JSON.parse(saved);
+            const completedChars = new Set(records.map(r => r.character));
+            let count = 0;
+            wordsList.forEach(w => {
+                if (completedChars.has(w.char)) count++;
             });
-            const activeCard = document.getElementById(`card-${wordId}`);
-            if (activeCard) {
-                activeCard.style.borderColor = word.type === 'curled' ? 'var(--rose-primary)' : 'var(--cyan-primary)';
-            }
+            return count;
+        } catch (e) {
+            return 0;
         }
     }
 
-    function updateArticulationPanelUI(specificWord = null) {
-        const t = translations[currentLang];
+    window.prevSpeakingWord = function() {
+        if (currentSpeakingIndex > 0) {
+            currentSpeakingIndex--;
+            renderSpeakingCards(currentFilterPair);
+        }
+    }
+
+    window.nextSpeakingWord = function() {
+        const gr = gradedWords[currentGradedLevel];
+        if (!gr) return;
         
-        let isCurled = false;
-        if (specificWord) {
-            isCurled = specificWord.type === 'curled';
-        } else {
-            // Find first word in any array inside the current graded level
-            const gr = gradedWords[currentGradedLevel];
-            let sampleCard = null;
-            if (gr) {
-                for (const key in gr) {
-                    if (Array.isArray(gr[key]) && gr[key].length > 0) {
-                        if (key === 'minimalPairs') {
-                            sampleCard = { type: 'flat' }; // z is flat
-                        } else if (key === 'minimalTriplets') {
-                            sampleCard = { type: 'curled' }; // zh is curled
-                        } else {
-                            sampleCard = gr[key][0];
-                        }
-                        if (sampleCard) break;
-                    }
-                }
-            }
-            isCurled = sampleCard && sampleCard.type === 'curled';
+        let flatWords = [];
+        if (currentGradedLevel === 'group1') {
+            const filter = currentFilterPair;
+            gr.minimalPairs.filter(w => filter === 'all' || w.pair === filter).forEach(p => {
+                flatWords.push(p.char1, p.char2);
+            });
+            gr.generalChars.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
+                flatWords.push(w.char);
+            });
+            gr.disyllabicWords.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
+                flatWords.push(w.char);
+            });
+        } else if (currentGradedLevel === 'group2') {
+            gr.minimalTriplets.forEach(t => {
+                flatWords.push(t.char1, t.char2, t.char3);
+            });
+            gr.mixedRetroflexes.filter(w => !w.id.includes('_')).forEach(w => {
+                flatWords.push(w.char);
+            });
+        } else if (currentGradedLevel === 'group3') {
+            gr.flatToCurled.forEach(w => {
+                flatWords.push(w.char);
+            });
+            gr.curledToFlat.forEach(w => {
+                flatWords.push(w.char);
+            });
+        } else if (currentGradedLevel === 'group4') {
+            gr.tongueTwisters.forEach(tt => {
+                flatWords.push(tt.char);
+            });
+        } else if (currentGradedLevel === 'group5') {
+            gr.passages.forEach(p => {
+                flatWords.push(p.rawText);
+            });
         }
 
-        const typeEl = document.getElementById('anatomy-type-title');
-        const descEl = document.getElementById('anatomy-type-description');
-        const bulletsEl = document.getElementById('anatomy-bullets');
-        const tonguePath = document.getElementById('svgTonguePath');
-        const targetGlow = document.getElementById('svgTargetGlow');
-
-        if (isCurled) {
-            // Retroflex zh, ch, sh Setup
-            typeEl.style.color = "var(--rose-primary)";
-            typeEl.innerHTML = `<i class="fa-solid fa-arrows-up-to-line"></i> ${t.curledTitle}`;
-            descEl.innerText = t.curledDesc;
-            bulletsEl.innerHTML = t.curledBullets.map(b => `<li>${b}</li>`).join('');
-            
-            // Adjust SVG paths to show curled tongue
-            tonguePath.setAttribute('d', 'M 50,140 Q 90,130 120,115 Q 155,75 140,55 Q 130,68 115,76 Q 80,95 50,110 Z');
-            targetGlow.setAttribute('cx', '140');
-            targetGlow.setAttribute('cy', '45');
-        } else {
-            // Flat sibilants z, c, s Setup
-            typeEl.style.color = "var(--cyan-primary)";
-            typeEl.innerHTML = `<i class="fa-solid fa-wind"></i> ${t.flatTitle}`;
-            descEl.innerText = t.flatDesc;
-            bulletsEl.innerHTML = t.flatBullets.map(b => `<li>${b}</li>`).join('');
-            
-            // Adjust SVG to flat tongue
-            tonguePath.setAttribute('d', 'M 50,140 Q 100,130 140,120 Q 160,95 168,75 Q 160,78 140,82 Q 90,90 50,110 Z');
-            targetGlow.setAttribute('cx', '172');
-            targetGlow.setAttribute('cy', '58');
+        if (currentSpeakingIndex < flatWords.length - 1) {
+            currentSpeakingIndex++;
+            renderSpeakingCards(currentFilterPair);
         }
     }
 
-    // Helper function to build a single card HTML
+    function renderSpeakingCards(filter = 'all') {
+        const grid = document.getElementById('cardsGrid');
+        grid.innerHTML = '';
+        
+        grid.style.gridTemplateColumns = "1fr";
+        grid.style.display = "flex";
+        grid.style.flexDirection = "column";
+        grid.style.alignItems = "center";
+
+        const gr = gradedWords[currentGradedLevel];
+        if (!gr) return;
+
+        let speakingWordsList = [];
+        
+        if (currentGradedLevel === 'group1') {
+            gr.minimalPairs.filter(w => filter === 'all' || w.pair === filter).forEach(p => {
+                const w1 = { id: p.id + '_1', char: p.char1, pinyin: p.pinyin1, highlight: p.pair.split('-')[0], type: 'flat', anatomy: 'Flat', meaning: `平舌音對比 / Đối âm: ${p.char2}(${p.pinyin2})` };
+                const w2 = { id: p.id + '_2', char: p.char2, pinyin: p.pinyin2, highlight: p.pair.split('-')[1], type: 'curled', anatomy: 'Curled', meaning: `捲舌音對比 / Đối âm: ${p.char1}(${p.pinyin1})` };
+                
+                if (!gradedWords.group1.generalChars.find(x => x.id === w1.id)) {
+                    gradedWords.group1.generalChars.push(w1);
+                    gradedWords.group1.generalChars.push(w2);
+                }
+                speakingWordsList.push(w1, w2);
+            });
+            gr.generalChars.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
+                speakingWordsList.push(w);
+            });
+            gr.disyllabicWords.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
+                speakingWordsList.push(w);
+            });
+        } else if (currentGradedLevel === 'group2') {
+            gr.minimalTriplets.forEach(t => {
+                const w1 = { id: t.id + '_1', char: t.char1, pinyin: t.pinyin1, highlight: 'zh', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char2}(${t.pinyin2}) / ${t.char3}(${t.pinyin3})` };
+                const w2 = { id: t.id + '_2', char: t.char2, pinyin: t.pinyin2, highlight: 'ch', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char1}(${t.pinyin1}) / ${t.char3}(${t.pinyin3})` };
+                const w3 = { id: t.id + '_3', char: t.char3, pinyin: t.pinyin3, highlight: 'sh', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char1}(${t.pinyin1}) / ${t.char2}(${t.pinyin2})` };
+                
+                if (!gradedWords.group2.mixedRetroflexes.find(x => x.id === w1.id)) {
+                    gradedWords.group2.mixedRetroflexes.push(w1);
+                    gradedWords.group2.mixedRetroflexes.push(w2);
+                    gradedWords.group2.mixedRetroflexes.push(w3);
+                }
+                speakingWordsList.push(w1, w2, w3);
+            });
+            gr.mixedRetroflexes.filter(w => !w.id.includes('_')).forEach(w => {
+                speakingWordsList.push(w);
+            });
+        } else if (currentGradedLevel === 'group3') {
+            gr.flatToCurled.forEach(w => {
+                speakingWordsList.push(w);
+            });
+            gr.curledToFlat.forEach(w => {
+                speakingWordsList.push(w);
+            });
+        } else if (currentGradedLevel === 'group4') {
+            gr.tongueTwisters.forEach(tt => {
+                const w = { id: tt.id, char: tt.char, pinyin: tt.pinyin, type: 'curled', anatomy: 'Curled', highlight: 'sh', meaning: tt.meaning, isTongueTwister: true, title: tt.title };
+                if (!gradedWords.group4.tongueTwisters.find(x => x.id === w.id)) {
+                    gradedWords.group4.tongueTwisters.push(w);
+                }
+                speakingWordsList.push(w);
+            });
+        } else if (currentGradedLevel === 'group5') {
+            gr.passages.forEach(p => {
+                const w = { id: p.id, char: p.rawText, pinyin: p.pinyin, type: 'curled', anatomy: 'Curled', highlight: 'zh-sh', meaning: p.meaning, isPassage: true, title: p.title };
+                if (!gradedWords.group5.passages.find(x => x.id === w.id)) {
+                    gradedWords.group5.passages.push(w);
+                }
+                speakingWordsList.push(w);
+            });
+        }
+
+        if (speakingWordsList.length === 0) {
+            grid.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 3rem;">Chưa có từ nào được mở khóa hoặc khớp bộ lọc.</div>`;
+            return;
+        }
+
+        if (currentSpeakingIndex >= speakingWordsList.length) currentSpeakingIndex = 0;
+        if (currentSpeakingIndex < 0) currentSpeakingIndex = 0;
+
+        const activeWord = speakingWordsList[currentSpeakingIndex];
+        const completedCount = getSpeakingCompletedCount(speakingWordsList);
+
+        const navHeaderHTML = `
+            <div class="speaking-nav-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; background: rgba(139, 92, 246, 0.06); padding: 0.8rem 1.2rem; border-radius: 16px; border: 1px solid rgba(139, 92, 246, 0.12); width: 100%; box-sizing: border-box; max-width: 650px; margin-left: auto; margin-right: auto; gap: 0.5rem; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: #a855f7; font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid fa-microphone-lines"></i> 口說跟讀 | Từ ${currentSpeakingIndex + 1} / ${speakingWordsList.length}
+                </span>
+                <div style="flex: 1; min-width: 120px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin: 0 0.5rem; position: relative;">
+                    <div style="width: ${((currentSpeakingIndex + 1) / speakingWordsList.length) * 100}%; height: 100%; background: linear-gradient(90deg, #a855f7, #38bdf8); border-radius: 3px; transition: width 0.3s ease;"></div>
+                </div>
+                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
+                    Đã luyện: ${completedCount}/${speakingWordsList.length}
+                </span>
+            </div>
+        `;
+
+        const cardHTML = buildCardHTML(activeWord);
+
+        const navFooterHTML = `
+            <div class="speaking-nav-footer" style="display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.2rem; width: 100%; max-width: 650px; margin-left: auto; margin-right: auto; box-sizing: border-box;">
+                <button class="btn-action" onclick="prevSpeakingWord()" style="flex: 1; padding: 0.8rem; border-radius: 14px; background: rgba(255,255,255,0.04); color: white; border: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s;" ${currentSpeakingIndex === 0 ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>
+                    <i class="fa-solid fa-chevron-left"></i> ⬅️ Trước (上一個)
+                </button>
+                <button class="btn-action" onclick="nextSpeakingWord()" style="flex: 1; padding: 0.8rem; border-radius: 14px; background: var(--purple-gradient); color: white; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s;" ${currentSpeakingIndex === speakingWordsList.length - 1 ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>
+                    Sau (下一個) ➡️ <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+
+        grid.insertAdjacentHTML('beforeend', navHeaderHTML);
+        grid.insertAdjacentHTML('beforeend', cardHTML);
+        grid.insertAdjacentHTML('beforeend', navFooterHTML);
+
+        setTimeout(() => {
+            selectPracticeWord(activeWord.id);
+        }, 50);
+    }
+
     function buildCardHTML(word) {
         const isFlat = word.type === 'flat';
         const cardClass = isFlat ? 'flat-type' : 'curled-type';
-        const typeLabel = isFlat ? '舌尖前音' : '舌尖後音';
+        
+        let typeLabel = isFlat ? '舌尖前音' : '舌尖後音';
+        if (word.isTongueTwister) {
+            typeLabel = currentLang === 'vi' ? 'Thử thách Líu lưỡi 💨' : '繞口令挑戰 💨';
+        } else if (word.isPassage) {
+            typeLabel = currentLang === 'vi' ? 'Đọc đoạn văn 📖' : '段落語流閱讀 📖';
+        }
         
         const locked = isItemLocked(word);
         const lockedClass = locked ? 'locked' : '';
@@ -4906,27 +5016,60 @@
 
         const recordBtnLabel = locked 
             ? '<span>🔒 鎖定</span>' 
-            : '<i class="fa-solid fa-microphone"></i> <span>開始跟讀</span>';
+            : `<i class="fa-solid fa-microphone"></i> <span>${word.isPassage ? (currentLang === 'vi' ? 'Bắt đầu đọc' : '開始朗讀') : (currentLang === 'vi' ? 'Bắt đầu đọc' : '開始跟讀')}</span>`;
         
         const typeBadge = locked 
             ? `<span class="badge-type" style="background: rgba(255,255,255,0.05); color: var(--text-muted);"><i class="fa-solid fa-lock"></i> 鎖定</span>`
             : `<span class="badge-type">${typeLabel}</span>`;
-            
+
+        // Adjust font sizes based on text length to fit single-card layout perfectly
+        let charFontSize = '4.5rem';
+        let charLineHeight = '1.2';
+        let textAlign = 'center';
+        let charSpacing = 'normal';
+        let charPadding = '0';
+        let charBg = 'transparent';
+        let charBorder = 'none';
+
+        if (word.char.length > 30) {
+            // Full passage
+            charFontSize = '1.3rem';
+            charLineHeight = '1.8';
+            textAlign = 'justify';
+            charSpacing = '1px';
+            charPadding = '1rem';
+            charBg = 'rgba(0,0,0,0.15)';
+            charBorder = '1px solid rgba(255,255,255,0.03)';
+        } else if (word.char.length > 5) {
+            // Tongue twister
+            charFontSize = '1.8rem';
+            charLineHeight = '1.4';
+            textAlign = 'left';
+            charSpacing = '1px';
+        }
+
+        const titleHeader = (word.isTongueTwister || word.isPassage)
+            ? `<h3 style="font-family: 'Noto Sans TC'; font-size: 1.25rem; font-weight: 900; color: #a855f7; margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.4rem;">
+                <i class="fa-solid ${word.isPassage ? 'fa-book-open' : 'fa-fire'}"></i> ${word.title}
+               </h3>`
+            : '';
+
         return `
-            <div class="practice-card ${cardClass} ${lockedClass}" id="card-${word.id}" onclick="${clickHandler}" style="cursor: pointer; transition: all 0.3s; border-width: 1px;">
-                <div class="card-header">
+            <div class="practice-card ${cardClass} ${lockedClass}" id="card-${word.id}" onclick="${clickHandler}" style="cursor: pointer; transition: all 0.3s; border-width: 1px; width: 100%; box-sizing: border-box; max-width: 650px; margin: 0 auto;">
+                <div class="card-header" style="margin-bottom: 0.75rem;">
                     ${typeBadge}
                     <div class="pinyin-group">
-                        <span class="pinyin-text">${word.pinyin}</span>
-                        <div class="phoneme-highlight">聲母 [${word.highlight}]</div>
+                        <span class="pinyin-text" style="font-size: ${word.char.length > 10 ? '0.85rem' : '1.2rem'}; line-height: 1.4; white-space: normal; word-break: break-word;">${word.pinyin}</span>
+                        ${(!word.isTongueTwister && !word.isPassage) ? `<div class="phoneme-highlight">聲母 [${word.highlight}]</div>` : ''}
                     </div>
                 </div>
                 
-                <div class="card-body">
-                    <div class="char-display">${word.char}</div>
+                <div class="card-body" style="padding: 0.5rem 0;">
+                    ${titleHeader}
+                    <div class="char-display" style="font-size: ${charFontSize}; line-height: ${charLineHeight}; text-align: ${textAlign}; letter-spacing: ${charSpacing}; padding: ${charPadding}; background: ${charBg}; border: ${charBorder}; border-radius: 12px; margin: 0.75rem 0; word-break: break-word;">${word.char}</div>
                     <div class="info-display">
-                        <div class="word-meaning">${word.meaning}</div>
-                        <div class="articulation-tip">${word.anatomy}</div>
+                        <div class="word-meaning" style="font-size: 0.88rem; line-height: 1.5; color: #d1d5db; border-left: 3px solid #a855f7; padding-left: 0.5rem;">${word.meaning}</div>
+                        ${(!word.isTongueTwister && !word.isPassage) ? `<div class="articulation-tip">${word.anatomy}</div>` : ''}
                     </div>
                 </div>
 
@@ -4953,7 +5096,7 @@
                     </div>
                 </div>
 
-                <div class="card-actions">
+                <div class="card-actions" style="margin-top: 1rem;">
                     <button class="btn-action btn-listen" onclick="event.stopPropagation(); ${locked ? '' : `speakTarget('${word.char}')`}">
                         <i class="fa-solid fa-volume-high"></i> 聽示範
                     </button>
@@ -4965,222 +5108,7 @@
         `;
     }
 
-    function renderSpeakingCards(filter = 'all') {
-        const grid = document.getElementById('cardsGrid');
-        grid.innerHTML = '';
 
-        // Adjust cards layout: Group 4 and 5 use 1 column wide, others use 3 columns grid
-        if (currentGradedLevel === 'group4' || currentGradedLevel === 'group5') {
-            grid.style.gridTemplateColumns = "1fr";
-        } else {
-            grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(340px, 1fr))";
-        }
-
-        const gr = gradedWords[currentGradedLevel];
-
-        if (currentGradedLevel === 'group1') {
-            // Render 3 sub-headings for Group 1 syllabus
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 1.5rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #a855f7;"><i class="fa-solid fa-scale-balanced"></i> 一、單音節字：同韻母對比 (精準對比題型)</h2>`);
-            
-            // Loop minimal pairs side-by-side
-            const minimalContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g1-minimal-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', minimalContainerHTML);
-            const minGrid = document.getElementById('g1-minimal-grid');
-            
-            gr.minimalPairs.filter(w => filter === 'all' || w.pair === filter).forEach(p => {
-                const w1 = { id: p.id + '_1', char: p.char1, pinyin: p.pinyin1, highlight: p.pair.split('-')[0], type: 'flat', anatomy: 'Flat', meaning: `平舌音對比 / Đối âm: ${p.char2}(${p.pinyin2})` };
-                const w2 = { id: p.id + '_2', char: p.char2, pinyin: p.pinyin2, highlight: p.pair.split('-')[1], type: 'curled', anatomy: 'Curled', meaning: `捲舌音對比 / Đối âm: ${p.char1}(${p.pinyin1})` };
-                
-                // Add these words dynamically to gradedWords under active session so they can be processed by recording listeners
-                if (!gradedWords.group1.generalChars.find(x => x.id === w1.id)) {
-                    gradedWords.group1.generalChars.push(w1);
-                    gradedWords.group1.generalChars.push(w2);
-                }
-                
-                minGrid.insertAdjacentHTML('beforeend', buildCardHTML(w1));
-                minGrid.insertAdjacentHTML('beforeend', buildCardHTML(w2));
-            });
-
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 2rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #38bdf8;"><i class="fa-solid fa-cubes"></i> 二、單音節字：其他字庫 (一般對比題型)</h2>`);
-            const generalContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g1-general-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', generalContainerHTML);
-            const genGrid = document.getElementById('g1-general-grid');
-            gr.generalChars.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
-                genGrid.insertAdjacentHTML('beforeend', buildCardHTML(w));
-            });
-
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 2rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #f43f5e;"><i class="fa-solid fa-font-awesome"></i> 三、雙音節詞彙對比 (日常高頻對比)</h2>`);
-            const disyllabicContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g1-disyllabic-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', disyllabicContainerHTML);
-            const dsGrid = document.getElementById('g1-disyllabic-grid');
-            gr.disyllabicWords.filter(w => !w.id.includes('_') && (filter === 'all' || w.pair === filter)).forEach(w => {
-                dsGrid.insertAdjacentHTML('beforeend', buildCardHTML(w));
-            });
-
-        } else if (currentGradedLevel === 'group2') {
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 1.5rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #a855f7;"><i class="fa-solid fa-scale-balanced"></i> 一、單音節字：同韻母對比 (zh vs ch vs sh)</h2>`);
-            const tripletsContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g2-triplets-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', tripletsContainerHTML);
-            const tripGrid = document.getElementById('g2-triplets-grid');
-            
-            gr.minimalTriplets.forEach(t => {
-                const w1 = { id: t.id + '_1', char: t.char1, pinyin: t.pinyin1, highlight: 'zh', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char2}(${t.pinyin2}) / ${t.char3}(${t.pinyin3})` };
-                const w2 = { id: t.id + '_2', char: t.char2, pinyin: t.pinyin2, highlight: 'ch', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char1}(${t.pinyin1}) / ${t.char3}(${t.pinyin3})` };
-                const w3 = { id: t.id + '_3', char: t.char3, pinyin: t.pinyin3, highlight: 'sh', type: 'curled', anatomy: 'Curled', meaning: `對比字: ${t.char1}(${t.pinyin1}) / ${t.char2}(${t.pinyin2})` };
-                
-                if (!gradedWords.group2.mixedRetroflexes.find(x => x.id === w1.id)) {
-                    gradedWords.group2.mixedRetroflexes.push(w1);
-                    gradedWords.group2.mixedRetroflexes.push(w2);
-                    gradedWords.group2.mixedRetroflexes.push(w3);
-                }
-                
-                tripGrid.insertAdjacentHTML('beforeend', buildCardHTML(w1));
-                tripGrid.insertAdjacentHTML('beforeend', buildCardHTML(w2));
-                tripGrid.insertAdjacentHTML('beforeend', buildCardHTML(w3));
-            });
-
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 2rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #f43f5e;"><i class="fa-solid fa-arrows-spin"></i> 二、雙音節詞彙 (舌尖後音混合連讀)</h2>`);
-            const mixedContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g2-mixed-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', mixedContainerHTML);
-            const mixGrid = document.getElementById('g2-mixed-grid');
-            gr.mixedRetroflexes.filter(w => !w.id.includes('_')).forEach(w => {
-                mixGrid.insertAdjacentHTML('beforeend', buildCardHTML(w));
-            });
-
-        } else if (currentGradedLevel === 'group3') {
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 1.5rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #38bdf8;"><i class="fa-solid fa-chevron-right"></i> 一、舌尖前音 ＋ 舌尖後音 (z/c/s + zh/ch/sh)</h2>`);
-            const fcContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g3-fc-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', fcContainerHTML);
-            const fcGrid = document.getElementById('g3-fc-grid');
-            gr.flatToCurled.forEach(w => {
-                fcGrid.insertAdjacentHTML('beforeend', buildCardHTML(w));
-            });
-
-            grid.insertAdjacentHTML('beforeend', `<h2 style="grid-column: 1/-1; margin: 2rem 0 0.75rem 0; font-family: 'Noto Sans TC'; font-weight: 900; color: #f43f5e;"><i class="fa-solid fa-chevron-left"></i> 二、舌尖後音 ＋ 舌尖前音 (zh/ch/sh + z/c/s)</h2>`);
-            const cfContainerHTML = `<div style="grid-column: 1/-1; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;" id="g3-cf-grid"></div>`;
-            grid.insertAdjacentHTML('beforeend', cfContainerHTML);
-            const cfGrid = document.getElementById('g3-cf-grid');
-            gr.curledToFlat.forEach(w => {
-                cfGrid.insertAdjacentHTML('beforeend', buildCardHTML(w));
-            });
-
-        } else if (currentGradedLevel === 'group4') {
-            // Render Tongue Twisters
-            gr.tongueTwisters.forEach(tt => {
-                const w = { id: tt.id, char: tt.char, pinyin: tt.pinyin, type: 'curled', anatomy: 'Curled', highlight: 'sh', meaning: tt.meaning };
-                // Make sure tongue twister word info is tracked in Group 4 database dynamically
-                if (!gradedWords.group4.tongueTwisters.find(x => x.id === w.id)) {
-                    gradedWords.group4.tongueTwisters.push(w);
-                }
-
-                const ttHTML = `
-                    <div class="practice-card curled-type" id="card-${tt.id}" onclick="selectPracticeWord('${tt.id}')" style="padding: 2rem; border-radius: 24px; margin-bottom: 1.5rem; cursor: pointer; transition: all 0.3s; border-width: 1px;">
-                        <h3 style="font-family: 'Noto Sans TC'; font-size: 1.3rem; font-weight: 900; color: #fbbf24; margin-bottom: 0.5rem;"><i class="fa-solid fa-fire"></i> ${tt.title}</h3>
-                        <p style="font-family: 'Outfit'; font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 0.5rem;">${tt.pinyin}</p>
-                        
-                        <div style="font-family: 'Noto Sans TC'; font-size: 2.2rem; font-weight: 900; color: white; margin: 1.2rem 0; line-height: 1.4; text-align: left; letter-spacing: 2px;">
-                            ${tt.char}
-                        </div>
-                        
-                        <p style="font-size: 0.9rem; font-style: italic; color: #9ca3af; border-left: 3px solid #fbbf24; padding-left: 0.75rem; margin-bottom: 1.5rem;">
-                            Dịch nghĩa: ${tt.meaning}
-                        </p>
-
-                        <div class="sound-wave" id="wave-${tt.id}" style="margin-bottom: 1rem;">
-                            <span></span><span></span><span></span><span></span>
-                            <span style="font-size: 0.75rem; color: #ef4444; margin-left: 0.5rem; animation: none; width: auto; height: auto;">錄音中...</span>
-                        </div>
-
-                        <div class="feedback-panel" id="feedback-${tt.id}" style="margin-bottom: 1.5rem;">
-                            <div class="feedback-status" id="status-${tt.id}">
-                                <div class="feedback-status-left">
-                                    <i class="fa-solid fa-circle-notch fa-spin"></i> 辨識中
-                                </div>
-                                <span class="feedback-status-right" id="sync-${tt.id}">本機快取</span>
-                            </div>
-                            <div id="text-${tt.id}" style="color: var(--text-main); font-weight: 600; line-height: 1.4;">辨識結果: ""</div>
-                            <div class="playback-row">
-                                <button class="btn-playback" onclick="event.stopPropagation(); playRecorded('${tt.id}')">
-                                    <i class="fa-solid fa-play"></i> 播放跟讀
-                                </button>
-                                <button class="btn-download" onclick="event.stopPropagation(); downloadRecorded('${tt.id}', '${tt.char}')" title="下載音檔">
-                                    <i class="fa-solid fa-download"></i> 下載
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 1rem;">
-                            <button class="btn-action btn-listen" onclick="event.stopPropagation(); speakTarget('${tt.char}')" style="flex: 1; padding: 0.8rem; border-radius: 14px;">
-                                <i class="fa-solid fa-volume-high"></i> 聽繞口令示範
-                            </button>
-                            <button class="btn-action btn-record" id="btn-record-${tt.id}" onclick="event.stopPropagation(); toggleRecord('${tt.id}')" style="flex: 1.2; padding: 0.8rem; border-radius: 14px; background: linear-gradient(135deg, #fbbf24, #f59e0b);">
-                                <i class="fa-solid fa-microphone"></i> <span>開始挑戰</span>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                grid.insertAdjacentHTML('beforeend', ttHTML);
-            });
-
-        } else if (currentGradedLevel === 'group5') {
-            // Render Paragraph Passages (Connected Speech)
-            gr.passages.forEach(p => {
-                const w = { id: p.id, char: p.rawText, pinyin: p.pinyin, type: 'curled', anatomy: 'Curled', highlight: 'zh-sh', meaning: p.meaning };
-                if (!gradedWords.group5.passages.find(x => x.id === w.id)) {
-                    gradedWords.group5.passages.push(w);
-                }
-
-                const passageHTML = `
-                    <div class="practice-card flat-type" id="card-${p.id}" onclick="selectPracticeWord('${p.id}')" style="padding: 2.2rem; border-radius: 24px; margin-bottom: 2rem; background: rgba(13, 18, 33, 0.85); border: 1px solid rgba(139, 92, 246, 0.15); cursor: pointer; transition: all 0.3s; border-width: 1px;">
-                        <h3 style="font-family: 'Noto Sans TC'; font-size: 1.4rem; font-weight: 900; color: #a855f7; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.5rem;">
-                            <i class="fa-solid fa-book-open"></i> ${p.title}
-                        </h3>
-                        
-                        <div style="font-family: 'Noto Sans TC'; font-size: 1.45rem; font-weight: 500; color: white; line-height: 2.2; text-align: justify; letter-spacing: 1px; margin-bottom: 1.5rem; background: rgba(0,0,0,0.15); padding: 1.2rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.02);">
-                            ${p.char}
-                        </div>
-                        
-                        <p style="font-size: 0.9rem; line-height: 1.6; color: #d1d5db; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 4px solid #a855f7;">
-                            <strong>Dịch nghĩa tiếng Việt:</strong> ${p.meaning}
-                        </p>
-
-                        <div class="sound-wave" id="wave-${p.id}" style="margin-bottom: 1rem;">
-                            <span></span><span></span><span></span><span></span>
-                            <span style="font-size: 0.75rem; color: #ef4444; margin-left: 0.5rem; animation: none; width: auto; height: auto;">段落錄音中...請完整朗讀全文...</span>
-                        </div>
-
-                        <div class="feedback-panel" id="feedback-${p.id}" style="margin-bottom: 1.5rem;">
-                            <div class="feedback-status" id="status-${p.id}">
-                                <div class="feedback-status-left">
-                                    <i class="fa-solid fa-circle-notch fa-spin"></i> 段落語流分析中
-                                </div>
-                                <span class="feedback-status-right" id="sync-${p.id}">雲端大數據</span>
-                            </div>
-                            <div id="text-${p.id}" style="color: var(--text-main); font-weight: 600; line-height: 1.4; font-size: 0.9rem; margin-top: 0.25rem;">辨識結果: ""</div>
-                            <div class="playback-row">
-                                <button class="btn-playback" onclick="event.stopPropagation(); playRecorded('${p.id}')">
-                                    <i class="fa-solid fa-play"></i> 播放我的段落錄音
-                                </button>
-                                <button class="btn-download" onclick="event.stopPropagation(); downloadRecorded('${p.id}', '${p.id}_passage')" title="下載語流音檔">
-                                    <i class="fa-solid fa-download"></i> 下載 WAV
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; gap: 1rem;">
-                            <button class="btn-action btn-listen" onclick="event.stopPropagation(); speakTarget('${p.rawText}')" style="flex: 1; padding: 0.8rem; border-radius: 14px; font-size: 0.85rem;">
-                                <i class="fa-solid fa-volume-high"></i> 聽全文標準朗讀
-                            </button>
-                            <button class="btn-action btn-record" id="btn-record-${p.id}" onclick="event.stopPropagation(); toggleRecord('${p.id}')" style="flex: 1.2; padding: 0.8rem; border-radius: 14px; background: var(--purple-gradient); font-size: 0.85rem;">
-                                <i class="fa-solid fa-microphone"></i> <span>開始朗讀全文挑戰</span>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                grid.insertAdjacentHTML('beforeend', passageHTML);
-            });
-        }
-    }
 
     // ==========================================
     // 🔬 DYNAMIC PHONETIC ACOUSTIC ANALYZER (DSP)
@@ -5311,163 +5239,11 @@
                 nasalF2Status = nasalPass 
                     ? (currentLang === 'vi' ? 'F2-F3 khép lại (Velar pinch), locus ~1300Hz' : '軟齶緊縮特徵顯著 (F2/F3 齶部緊縮，過渡至 ~1300Hz)') 
                     : (currentLang === 'vi' ? 'F2 vượt quá 1600Hz (Lưỡi bị đưa ra trước thành -n)' : '發音前伸偏差 (F2 偏高，舌根未抵軟齶，發成前鼻音 -n)');
+            }
+        }
         
         let diagnosticMsg = '';
         let diagnosticCode = 'NORMAL';
-        
-        const processGrading = (recognitionText) => {
-            if (recognitionTimeout) {
-                clearTimeout(recognitionTimeout);
-                recognitionTimeout = null;
-            }
-            onRecognitionFinished = null;
-
-            const cleanedResult = (recognitionText || "").trim();
-            const isMatch = cleanedResult.includes(wordInfo.char);
-
-            // We combine Speech Recognition match with Acoustic compliance!
-            const isAcousticValid = (acousticResults.diagnosticCode === 'NORMAL');
-            const isPerfectMatch = isMatch && isAcousticValid;
-
-            // Extract features to match with norms
-            const studentMetrics = {
-                cog: acousticResults.cog,
-                vot: acousticResults.vot,
-                cutoff: acousticResults.cutoff,
-                skewness: acousticResults.skewness,
-                f1: acousticResults.f1,
-                f2: acousticResults.f2,
-                f3: acousticResults.f3,
-                f2Locus: acousticResults.f2Locus,
-                pinching: acousticResults.pinching
-            };
-
-            const normGrading = calculateScoreFromNorms(wordInfo.char, studentMetrics);
-            let prScore = normGrading.score;
-
-            // Adjust score dynamically based on Speech Recognition
-            // Optimization: if Google STT is slow/fails, but acoustics are perfect, give a very high score (88-93) instead of failing!
-            if (!isMatch) {
-                if (isAcousticValid) {
-                    prScore = Math.max(88, Math.min(93, prScore - 5));
-                } else {
-                    prScore = Math.max(40, Math.min(65, prScore - 20));
-                }
-            }
-
-            const isSuccess = isPerfectMatch || (isAcousticValid && prScore >= 85);
-
-            // Magic sparkles explosion for successful pronunciation match!
-            if (isSuccess && prScore >= 90) {
-                const btnRect = recordBtn.getBoundingClientRect();
-                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 50);
-            }
-
-            // Trigger gamified stage animation feedback!
-            triggerGameFeedback(isSuccess, prScore);
-
-            // Crown crown trigger
-            const unlockCrown = prScore >= 95;
-
-            let helperFeedback = '';
-            if (isSuccess) {
-                statusEl.className = 'feedback-status success';
-                const successLabel = isPerfectMatch 
-                    ? (currentLang === 'vi' ? 'Hoàn hảo!' : '完美契合!') 
-                    : (currentLang === 'vi' ? 'Chuẩn âm học!' : '聲學特徵優異!');
-                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-crown" style="color: #fbbf24; animation: pulse 1s infinite;"></i> 發音得分: <strong style="font-size: 1.1rem; color: #fbbf24; margin-left: 0.25rem;">${prScore}分</strong> (${successLabel})`;
-                if (currentLang === 'vi') {
-                    helperFeedback = `Tuyệt vời! Bạn đạt ${prScore} điểm. Phát âm cực kỳ chuẩn xác! 👑`;
-                } else if (currentLang === 'en') {
-                    helperFeedback = `Excellent! You scored ${prScore} points. Flawless! 👑`;
-                } else {
-                    helperFeedback = `太厲害了！發音榮獲 ${prScore} 分，解鎖黃金皇冠！👑`;
-                }
-                
-                // Giant fireworks explosion for perfect crowns
-                const btnRect = recordBtn.getBoundingClientRect();
-                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 60);
-            } else if (isMatch) {
-                statusEl.className = 'feedback-status warning';
-                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-circle-info"></i> 發音得分: <strong style="font-size: 1.05rem; color: var(--warning-color); margin-left: 0.25rem;">${prScore}分</strong> (尚可)`;
-                if (currentLang === 'vi') {
-                    helperFeedback = `Nhận diện đúng chữ, đạt ${prScore} điểm. Hãy xem hướng dẫn bên dưới để nâng điểm lên 95 nhé!`;
-                } else if (currentLang === 'en') {
-                    helperFeedback = `Word recognized, scored ${prScore} points. Follow the acoustic tips below to reach 95+!`;
-                } else {
-                    helperFeedback = `辨識成功，榮獲 ${prScore} 分。請閱讀下方聲學指引，朝 95 分完美皇冠挑戰！`;
-                }
-            } else {
-                statusEl.className = 'feedback-status warning';
-                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> 發音得分: <strong style="font-size: 1rem; color: var(--rose-primary); margin-left: 0.25rem;">${prScore}分</strong> (需加油)`;
-                if (currentLang === 'vi') {
-                    helperFeedback = wordInfo.type === 'curled'
-                        ? `Chú ý: Đây là âm cuốn lưỡi [${wordInfo.highlight}]. Vui lòng uốn đầu lưỡi lên gần vòm họng trên.`
-                        : `Chú ý: Đây là âm đầu lưỡi trước [${wordInfo.highlight}]. Vui lòng duỗi thẳng đầu lưỡi chạm mặt sau răng cửa trên.`;
-                } else if (currentLang === 'en') {
-                    helperFeedback = wordInfo.type === 'curled'
-                        ? `Tip: This is a retroflex [${wordInfo.highlight}]. Curl your tongue tip up toward the hard palate.`
-                        : `Tip: This is a flat sibilant [${wordInfo.highlight}]. Keep your tongue tip completely flat behind front teeth.`;
-                } else {
-                    helperFeedback = wordInfo.type === 'curled'
-                        ? `提示：這是舌尖後音 [${wordInfo.highlight}]，舌尖請捲起靠近硬腭。`
-                        : `提示：這是舌尖前音 [${wordInfo.highlight}]，舌尖平伸放鬆抵上齒背。`;
-                }
-            }
-
-            const cogColor = acousticResults.diagnosticCode === 'RETRACTED_ERR' || acousticResults.diagnosticCode === 'FRONTING_ERR' ? '#ef4444' : '#10b981';
-            const votColor = acousticResults.diagnosticCode === 'VOT_SHORT' || acousticResults.diagnosticCode === 'VOT_LONG' ? '#f59e0b' : '#10b981';
-            const nasalColor = acousticResults.nasalPass ? '#10b981' : '#ef4444';
-            
-            let nasalHTML = '';
-            if (acousticResults.isNasalEnding) {
-                nasalHTML = `
-                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.05); margin-top: 0.25rem; padding-top: 0.25rem;">
-                        👃 鼻音尾共鳴定位 (F1-F2): <span style="font-weight: 700; color: ${nasalColor};">${acousticResults.nasalStatus}</span>
-                    </div>
-                `;
-            }
-
-            const acousticDiagCardHTML = `
-                <div class="acoustic-diag-card" style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.25); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: left;">
-                    <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.4rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
-                        <i class="fa-solid fa-microscope"></i> 🔬 聲學物理特徵診斷 (Acoustic Diagnostics)
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; font-size: 0.72rem; color: var(--text-main);">
-                        <div>📊 重心頻率 (COG): <span style="font-weight: 700; color: ${cogColor};">${acousticResults.cog} Hz</span></div>
-                        <div>⏱️ 送氣時間 (VOT): <span style="font-weight: 700; color: ${votColor};">${acousticResults.vot} ms</span></div>
-                        <div style="grid-column: span 2;">📢 截止頻率 (Lower Cutoff): <span style="font-weight:700; color: #38bdf8;">${acousticResults.cutoff} Hz</span></div>
-                        ${nasalHTML}
-                    </div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
-                        💡 <b>診斷引導：</b>${acousticResults.diagnosticMsg}
-                    </div>
-                </div>
-            `;
-
-            textEl.innerHTML = `
-                辨識為: <b style="font-size: 1.1rem; color: white;">"${cleanedResult || '（無辨識）'}"</b>
-                <br><span style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-top: 0.25rem;">${helperFeedback}</span>
-                ${acousticDiagCardHTML}
-            `;
-
-            uploadAndSaveRecord(wordInfo, cleanedResult || "（自主對比，未辨識）", isSuccess, wavBlob, acousticResults, prScore);
-        };
-
-        // If Speech Recognition has already returned, process immediately
-        if (!recognition || activeRecognitionResult !== "") {
-            processGrading(activeRecognitionResult);
-        } else {
-            onRecognitionFinished = (resultText) => {
-                processGrading(resultText);
-            };
-            // Max wait of 1.2s to prevent slow network lag
-            recognitionTimeout = setTimeout(() => {
-                if (typeof onRecognitionFinished === 'function') {
-                    onRecognitionFinished("");
-                }
-            }, 1200);
-        }
         
         if (wordInfo.type === 'flat') {
             if (calculatedCog < 4800) {
@@ -5804,6 +5580,13 @@
             if (isSuccess && prScore >= 90) {
                 const btnRect = recordBtn.getBoundingClientRect();
                 createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 50);
+
+                // Auto-advance to next word after 3 seconds
+                setTimeout(() => {
+                    if (currentPracticeMode === 'speaking') {
+                        nextSpeakingWord();
+                    }
+                }, 3000);
             }
 
             // Trigger gamified stage animation feedback!
