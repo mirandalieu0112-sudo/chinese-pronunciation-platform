@@ -4647,7 +4647,7 @@
 
         // Auto-advance in both cases!
         if (quizTimeout) clearTimeout(quizTimeout);
-        const autoAdvanceDelay = isCorrect ? 1500 : 2500;
+        const autoAdvanceDelay = isCorrect ? 100 : 2000;
         quizTimeout = setTimeout(() => {
             nextQuizStep(isFinished);
         }, autoAdvanceDelay);
