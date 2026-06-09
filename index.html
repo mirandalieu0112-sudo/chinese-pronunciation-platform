@@ -4084,6 +4084,22 @@
         
         // Play voice greeting
         playVoiceGreeting();
+
+        // Request microphone permission proactively on login/register to check if it's blocked
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    // Permission granted! Stop the tracks immediately to release the microphone.
+                    stream.getTracks().forEach(track => track.stop());
+                    console.log("Microphone access proactively granted on registration.");
+                })
+                .catch(err => {
+                    console.error("Proactive microphone request failed:", err);
+                    showToast(currentLang === 'vi' 
+                        ? "⚠️ Cảnh báo: Không thể truy cập Micro! Vui lòng cấp quyền trong cài đặt trình duyệt để sử dụng tính năng luyện đọc." 
+                        : "⚠️ 警告：無法取得麥克風權限，請在瀏覽器設定中允許麥克風權限以進行口說練習。");
+                });
+        }
     }
 
     function updateStudentBadge() {
