@@ -4582,7 +4582,7 @@
 
         currentQuestion.options.forEach(opt => {
             const btnHTML = `
-                <button class="btn-quiz-option" onclick="handleQuizAnswer(this, ${opt.correct}, '${opt.id}')">
+                <button class="btn-quiz-option" data-correct="${opt.correct}" onclick="handleQuizAnswer(this, ${opt.correct}, '${opt.id}')">
                     <span class="opt-char" style="font-size: 1.6rem; font-weight: 700;">${opt.char}</span>
                     <span class="opt-pinyin" style="font-size: 0.95rem; font-weight: bold; color: var(--text-muted);">(${opt.pinyin})</span>
                 </button>
@@ -4642,9 +4642,11 @@
             const randomEncouragement = encouragements[Math.floor(Math.random() * encouragements.length)];
             showToast(randomEncouragement);
 
-            // Highlight the correct one in green immediately to guide learning
+            // Highlight the correct option in green immediately to guide learning
             document.querySelectorAll('.btn-quiz-option').forEach(btn => {
-                if (btn !== btnEl) btn.classList.add('correct');
+                if (btn.getAttribute('data-correct') === 'true') {
+                    btn.classList.add('correct');
+                }
             });
         }
 
@@ -4789,7 +4791,7 @@
                 wordId: wordInfo.id,
                 character: wordInfo.char,
                 pinyin: wordInfo.pinyin,
-                highlight: wordInfo.highlight,
+                highlight: wordInfo.highlight || "N/A",
                 recognizedText: isCorrect ? "答對 / Correct" : "答錯 / Wrong",
                 isMatch: isCorrect,
                 audioUrl: "N/A (聽力選擇題)",
