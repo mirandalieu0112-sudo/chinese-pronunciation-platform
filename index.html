@@ -5309,11 +5309,163 @@
                 nasalF2Status = nasalPass 
                     ? (currentLang === 'vi' ? 'F2-F3 khép lại (Velar pinch), locus ~1300Hz' : '軟齶緊縮特徵顯著 (F2/F3 齶部緊縮，過渡至 ~1300Hz)') 
                     : (currentLang === 'vi' ? 'F2 vượt quá 1600Hz (Lưỡi bị đưa ra trước thành -n)' : '發音前伸偏差 (F2 偏高，舌根未抵軟齶，發成前鼻音 -n)');
-            }
-        }
         
         let diagnosticMsg = '';
         let diagnosticCode = 'NORMAL';
+        
+        const processGrading = (recognitionText) => {
+            if (recognitionTimeout) {
+                clearTimeout(recognitionTimeout);
+                recognitionTimeout = null;
+            }
+            onRecognitionFinished = null;
+
+            const cleanedResult = (recognitionText || "").trim();
+            const isMatch = cleanedResult.includes(wordInfo.char);
+
+            // We combine Speech Recognition match with Acoustic compliance!
+            const isAcousticValid = (acousticResults.diagnosticCode === 'NORMAL');
+            const isPerfectMatch = isMatch && isAcousticValid;
+
+            // Extract features to match with norms
+            const studentMetrics = {
+                cog: acousticResults.cog,
+                vot: acousticResults.vot,
+                cutoff: acousticResults.cutoff,
+                skewness: acousticResults.skewness,
+                f1: acousticResults.f1,
+                f2: acousticResults.f2,
+                f3: acousticResults.f3,
+                f2Locus: acousticResults.f2Locus,
+                pinching: acousticResults.pinching
+            };
+
+            const normGrading = calculateScoreFromNorms(wordInfo.char, studentMetrics);
+            let prScore = normGrading.score;
+
+            // Adjust score dynamically based on Speech Recognition
+            // Optimization: if Google STT is slow/fails, but acoustics are perfect, give a very high score (88-93) instead of failing!
+            if (!isMatch) {
+                if (isAcousticValid) {
+                    prScore = Math.max(88, Math.min(93, prScore - 5));
+                } else {
+                    prScore = Math.max(40, Math.min(65, prScore - 20));
+                }
+            }
+
+            const isSuccess = isPerfectMatch || (isAcousticValid && prScore >= 85);
+
+            // Magic sparkles explosion for successful pronunciation match!
+            if (isSuccess && prScore >= 90) {
+                const btnRect = recordBtn.getBoundingClientRect();
+                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 50);
+            }
+
+            // Trigger gamified stage animation feedback!
+            triggerGameFeedback(isSuccess, prScore);
+
+            // Crown crown trigger
+            const unlockCrown = prScore >= 95;
+
+            let helperFeedback = '';
+            if (isSuccess) {
+                statusEl.className = 'feedback-status success';
+                const successLabel = isPerfectMatch 
+                    ? (currentLang === 'vi' ? 'Hoàn hảo!' : '完美契合!') 
+                    : (currentLang === 'vi' ? 'Chuẩn âm học!' : '聲學特徵優異!');
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-crown" style="color: #fbbf24; animation: pulse 1s infinite;"></i> 發音得分: <strong style="font-size: 1.1rem; color: #fbbf24; margin-left: 0.25rem;">${prScore}分</strong> (${successLabel})`;
+                if (currentLang === 'vi') {
+                    helperFeedback = `Tuyệt vời! Bạn đạt ${prScore} điểm. Phát âm cực kỳ chuẩn xác! 👑`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = `Excellent! You scored ${prScore} points. Flawless! 👑`;
+                } else {
+                    helperFeedback = `太厲害了！發音榮獲 ${prScore} 分，解鎖黃金皇冠！👑`;
+                }
+                
+                // Giant fireworks explosion for perfect crowns
+                const btnRect = recordBtn.getBoundingClientRect();
+                createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 60);
+            } else if (isMatch) {
+                statusEl.className = 'feedback-status warning';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-circle-info"></i> 發音得分: <strong style="font-size: 1.05rem; color: var(--warning-color); margin-left: 0.25rem;">${prScore}分</strong> (尚可)`;
+                if (currentLang === 'vi') {
+                    helperFeedback = `Nhận diện đúng chữ, đạt ${prScore} điểm. Hãy xem hướng dẫn bên dưới để nâng điểm lên 95 nhé!`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = `Word recognized, scored ${prScore} points. Follow the acoustic tips below to reach 95+!`;
+                } else {
+                    helperFeedback = `辨識成功，榮獲 ${prScore} 分。請閱讀下方聲學指引，朝 95 分完美皇冠挑戰！`;
+                }
+            } else {
+                statusEl.className = 'feedback-status warning';
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> 發音得分: <strong style="font-size: 1rem; color: var(--rose-primary); margin-left: 0.25rem;">${prScore}分</strong> (需加油)`;
+                if (currentLang === 'vi') {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `Chú ý: Đây là âm cuốn lưỡi [${wordInfo.highlight}]. Vui lòng uốn đầu lưỡi lên gần vòm họng trên.`
+                        : `Chú ý: Đây là âm đầu lưỡi trước [${wordInfo.highlight}]. Vui lòng duỗi thẳng đầu lưỡi chạm mặt sau răng cửa trên.`;
+                } else if (currentLang === 'en') {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `Tip: This is a retroflex [${wordInfo.highlight}]. Curl your tongue tip up toward the hard palate.`
+                        : `Tip: This is a flat sibilant [${wordInfo.highlight}]. Keep your tongue tip completely flat behind front teeth.`;
+                } else {
+                    helperFeedback = wordInfo.type === 'curled'
+                        ? `提示：這是舌尖後音 [${wordInfo.highlight}]，舌尖請捲起靠近硬腭。`
+                        : `提示：這是舌尖前音 [${wordInfo.highlight}]，舌尖平伸放鬆抵上齒背。`;
+                }
+            }
+
+            const cogColor = acousticResults.diagnosticCode === 'RETRACTED_ERR' || acousticResults.diagnosticCode === 'FRONTING_ERR' ? '#ef4444' : '#10b981';
+            const votColor = acousticResults.diagnosticCode === 'VOT_SHORT' || acousticResults.diagnosticCode === 'VOT_LONG' ? '#f59e0b' : '#10b981';
+            const nasalColor = acousticResults.nasalPass ? '#10b981' : '#ef4444';
+            
+            let nasalHTML = '';
+            if (acousticResults.isNasalEnding) {
+                nasalHTML = `
+                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.05); margin-top: 0.25rem; padding-top: 0.25rem;">
+                        👃 鼻音尾共鳴定位 (F1-F2): <span style="font-weight: 700; color: ${nasalColor};">${acousticResults.nasalStatus}</span>
+                    </div>
+                `;
+            }
+
+            const acousticDiagCardHTML = `
+                <div class="acoustic-diag-card" style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.25); border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); text-align: left;">
+                    <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.4rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <i class="fa-solid fa-microscope"></i> 🔬 聲學物理特徵診斷 (Acoustic Diagnostics)
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; font-size: 0.72rem; color: var(--text-main);">
+                        <div>📊 重心頻率 (COG): <span style="font-weight: 700; color: ${cogColor};">${acousticResults.cog} Hz</span></div>
+                        <div>⏱️ 送氣時間 (VOT): <span style="font-weight: 700; color: ${votColor};">${acousticResults.vot} ms</span></div>
+                        <div style="grid-column: span 2;">📢 截止頻率 (Lower Cutoff): <span style="font-weight:700; color: #38bdf8;">${acousticResults.cutoff} Hz</span></div>
+                        ${nasalHTML}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
+                        💡 <b>診斷引導：</b>${acousticResults.diagnosticMsg}
+                    </div>
+                </div>
+            `;
+
+            textEl.innerHTML = `
+                辨識為: <b style="font-size: 1.1rem; color: white;">"${cleanedResult || '（無辨識）'}"</b>
+                <br><span style="font-size: 0.75rem; color: var(--text-muted); display:block; margin-top: 0.25rem;">${helperFeedback}</span>
+                ${acousticDiagCardHTML}
+            `;
+
+            uploadAndSaveRecord(wordInfo, cleanedResult || "（自主對比，未辨識）", isSuccess, wavBlob, acousticResults, prScore);
+        };
+
+        // If Speech Recognition has already returned, process immediately
+        if (!recognition || activeRecognitionResult !== "") {
+            processGrading(activeRecognitionResult);
+        } else {
+            onRecognitionFinished = (resultText) => {
+                processGrading(resultText);
+            };
+            // Max wait of 1.2s to prevent slow network lag
+            recognitionTimeout = setTimeout(() => {
+                if (typeof onRecognitionFinished === 'function') {
+                    onRecognitionFinished("");
+                }
+            }, 1200);
+        }
         
         if (wordInfo.type === 'flat') {
             if (calculatedCog < 4800) {
@@ -5471,6 +5623,8 @@
     let audioBuffer = [];
     let bufferLength = 0;
     let wavSampleRate = 16000;
+    let onRecognitionFinished = null;
+    let recognitionTimeout = null;
 
     async function toggleRecord(cardId) {
         const wordInfo = findWordById(cardId);
@@ -5539,9 +5693,16 @@
                     textEl.innerText = `語音輸入中...`;
                 };
 
-                recognition.onerror = () => {};
+                recognition.onerror = () => {
+                    if (typeof onRecognitionFinished === 'function') {
+                        onRecognitionFinished("");
+                    }
+                };
                 recognition.onresult = (event) => {
                     activeRecognitionResult = event.results[0][0].transcript;
+                    if (typeof onRecognitionFinished === 'function') {
+                        onRecognitionFinished(activeRecognitionResult);
+                    }
                 };
 
                 activeRecognitionResult = "";
@@ -5595,8 +5756,14 @@
         // 🔬 Run live acoustic analysis on raw buffer!
         const acousticResults = calculateAcousticFeatures(resultBuffer, wavSampleRate, wordInfo);
 
-        setTimeout(() => {
-            const cleanedResult = (activeRecognitionResult || "").trim();
+        const processGrading = (recognitionText) => {
+            if (recognitionTimeout) {
+                clearTimeout(recognitionTimeout);
+                recognitionTimeout = null;
+            }
+            onRecognitionFinished = null;
+
+            const cleanedResult = (recognitionText || "").trim();
             const isMatch = cleanedResult.includes(wordInfo.char);
 
             // We combine Speech Recognition match with Acoustic compliance!
@@ -5725,8 +5892,23 @@
                 ${acousticDiagCardHTML}
             `;
 
-            uploadAndSaveRecord(wordInfo, cleanedResult || "（自主對比，未辨識）", isPerfectMatch, wavBlob, acousticResults, prScore);
-        }, 500);
+            uploadAndSaveRecord(wordInfo, cleanedResult || "（自主對比，未辨識）", isSuccess, wavBlob, acousticResults, prScore);
+        };
+
+        // If Speech Recognition has already returned, run immediately
+        if (!recognition || activeRecognitionResult !== "") {
+            processGrading(activeRecognitionResult);
+        } else {
+            onRecognitionFinished = (resultText) => {
+                processGrading(resultText);
+            };
+            // Max wait of 1.2s to prevent slow network lag
+            recognitionTimeout = setTimeout(() => {
+                if (typeof onRecognitionFinished === 'function') {
+                    onRecognitionFinished("");
+                }
+            }, 1200);
+        }
     }
 
     async function uploadAndSaveRecord(wordInfo, recognizedText, isMatch, wavBlob, acousticResults, score) {
