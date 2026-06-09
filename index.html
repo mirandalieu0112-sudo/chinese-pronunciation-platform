@@ -5593,6 +5593,9 @@
         const acousticResults = calculateAcousticFeatures(resultBuffer, wavSampleRate, wordInfo);
 
         setTimeout(() => {
+            const cleanedResult = (activeRecognitionResult || "").trim();
+            const isMatch = cleanedResult.includes(wordInfo.char);
+
             // We combine Speech Recognition match with Acoustic compliance!
             const isAcousticValid = (acousticResults.diagnosticCode === 'NORMAL');
             const isPerfectMatch = isMatch && isAcousticValid;
@@ -5614,26 +5617,36 @@
             let prScore = normGrading.score;
 
             // Adjust score dynamically based on Speech Recognition
+            // Optimization: if Google STT is slow/fails, but acoustics are perfect, give a very high score (88-93) instead of failing!
             if (!isMatch) {
-                prScore = Math.max(40, Math.min(65, prScore - 20));
+                if (isAcousticValid) {
+                    prScore = Math.max(88, Math.min(93, prScore - 5));
+                } else {
+                    prScore = Math.max(40, Math.min(65, prScore - 20));
+                }
             }
 
+            const isSuccess = isPerfectMatch || (isAcousticValid && prScore >= 85);
+
             // Magic sparkles explosion for successful pronunciation match!
-            if (isPerfectMatch && prScore >= 90) {
+            if (isSuccess && prScore >= 90) {
                 const btnRect = recordBtn.getBoundingClientRect();
                 createSparklerBurst(btnRect.left + btnRect.width / 2, btnRect.top + btnRect.height / 2, 50);
             }
 
             // Trigger gamified stage animation feedback!
-            triggerGameFeedback(isPerfectMatch, prScore);
+            triggerGameFeedback(isSuccess, prScore);
 
             // Crown crown trigger
             const unlockCrown = prScore >= 95;
 
             let helperFeedback = '';
-            if (isPerfectMatch) {
+            if (isSuccess) {
                 statusEl.className = 'feedback-status success';
-                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-crown" style="color: #fbbf24; animation: pulse 1s infinite;"></i> 發音得分: <strong style="font-size: 1.1rem; color: #fbbf24; margin-left: 0.25rem;">${prScore}分</strong> (完美契合!)`;
+                const successLabel = isPerfectMatch 
+                    ? (currentLang === 'vi' ? 'Hoàn hảo!' : '完美契合!') 
+                    : (currentLang === 'vi' ? 'Chuẩn âm học!' : '聲學特徵優異!');
+                statusEl.querySelector('.feedback-status-left').innerHTML = `<i class="fa-solid fa-crown" style="color: #fbbf24; animation: pulse 1s infinite;"></i> 發音得分: <strong style="font-size: 1.1rem; color: #fbbf24; margin-left: 0.25rem;">${prScore}分</strong> (${successLabel})`;
                 if (currentLang === 'vi') {
                     helperFeedback = `Tuyệt vời! Bạn đạt ${prScore} điểm. Phát âm cực kỳ chuẩn xác! 👑`;
                 } else if (currentLang === 'en') {
